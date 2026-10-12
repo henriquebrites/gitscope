@@ -17,8 +17,14 @@ function usesToken(classes: string[], prefixes: string[], tokens: string[]): boo
 
 // DESIGN.md spacing steps on the 4px base: xxs 1, xs 2, sm 3, md 4, lg 6, xl 8, 2xl 10,
 // 3xl 16, 4xl 24, section 32.
-const designSpacingSteps = new Set(['1', '2', '3', '4', '6', '8', '10', '16', '24', '32', 'auto'])
-const spacingClass = /^-?(?:[pm][xytrbl]?|gap(?:-[xy])?|space-[xy])-(.+)$/
+const designSpacingSteps = new Set(['1', '2', '3', '4', '6', '8', '10', '16', '24', '32'])
+// Utilities Tailwind sizes from --spacing. Keywords (auto, full, screen) and container
+// names (max-w-3xl) are not spacing steps; numbers and arbitrary values are.
+const spacingClass = new RegExp(
+  '^-?(?:[pm][xytrblse]?|gap(?:-[xy])?|space-[xy]|(?:min-|max-)?[wh]|size|inset(?:-[xy])?|' +
+    'top|right|bottom|left|start|end|translate-[xy]|scroll-[pm][xytrblse]?|basis|indent)-(.+)$',
+)
+const isSpacingValue = (value: string) => /^(?:\d+(?:\.\d+)?|\[.*\]|\(.*\))$/.test(value)
 
 describe('App', () => {
   it('renders the home heading', () => {
@@ -34,7 +40,9 @@ describe('App', () => {
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
     expect(usesToken(classes, ['font'], tokensOf('font')), 'font family').toBe(true)
-    const spacingSteps = classes.flatMap((name) => name.match(spacingClass)?.[1] ?? [])
+    const spacingSteps = classes
+      .flatMap((name) => name.match(spacingClass)?.[1] ?? [])
+      .filter(isSpacingValue)
     expect(spacingSteps.length, 'spacing').toBeGreaterThan(0)
     expect(spacingSteps.filter((step) => !designSpacingSteps.has(step)), 'spacing').toEqual([])
     expect(usesToken(classes, ['rounded'], tokensOf('radius')), 'radius').toBe(true)
