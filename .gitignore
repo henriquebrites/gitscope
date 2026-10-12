@@ -33,6 +33,7 @@ AGENTS.md
 .agents/
 .tasks/
 .checks/
+skills-lock.json
 
 # Playwright
 /test-results/
