@@ -1,111 +1,114 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@import 'tailwindcss';
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+/*
+ * Tokens from DESIGN.md (Vercel / Geist), mapped to the Tailwind v4 theme.
+ * Text tokens adjusted to reach WCAG AA (4.5:1) on canvas, canvas-elevated and hairline-soft:
+ *   mute       #8f8f8f -> #636363
+ *   faint      #a1a1a1 -> #6b6b6b
+ *   link       #0070f3 -> #0761d1 (the original link-deep)
+ *   link-deep  #0761d1 -> #0550b0
+ *   error      #ee0000 -> #c50000 (the original error-deep)
+ *   error-deep #c50000 -> #a30000
+ */
+@theme {
+  --color-*: initial;
+  --color-primary: #171717;
+  --color-on-primary: #ffffff;
+  --color-ink: #171717;
+  --color-body: #4d4d4d;
+  --color-mute: #636363;
+  --color-faint: #6b6b6b;
+  --color-hairline: #ebebeb;
+  --color-hairline-soft: #f2f2f2;
+  --color-canvas: #fafafa;
+  --color-canvas-elevated: #ffffff;
+  --color-link: #0761d1;
+  --color-link-deep: #0550b0;
+  --color-link-soft: #d3e5ff;
+  --color-error: #c50000;
+  --color-error-deep: #a30000;
+  --color-warning: #f5a623;
+  --color-warning-soft: #ffefcf;
+  --color-warning-deep: #ab570a;
+  --color-violet: #7928ca;
+  --color-violet-soft: #d8ccf1;
+  --color-cyan: #50e3c2;
+  --color-cyan-soft: #aaffec;
+  --color-pink: #ff0080;
+  --color-magenta: #eb367f;
+  --color-gradient-develop-start: #007cf0;
+  --color-gradient-develop-end: #00dfd8;
+  --color-gradient-preview-start: #7928ca;
+  --color-gradient-preview-end: #ff0080;
+  --color-gradient-ship-start: #ff4d4d;
+  --color-gradient-ship-end: #f9cb28;
+  --color-focus: #0761d1;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --font-sans: 'Geist Variable', Arial, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  --text-display-xl: 3rem;
+  --text-display-xl--line-height: 3rem;
+  --text-display-xl--letter-spacing: -0.05em;
+  --text-display-xl--font-weight: 600;
+  --text-heading-lg: 2rem;
+  --text-heading-lg--line-height: 2.5rem;
+  --text-heading-lg--letter-spacing: -0.04em;
+  --text-heading-lg--font-weight: 600;
+  --text-heading-md: 1.25rem;
+  --text-heading-md--line-height: 1.75rem;
+  --text-heading-md--letter-spacing: -0.02em;
+  --text-heading-md--font-weight: 600;
+  --text-label-sm: 0.875rem;
+  --text-label-sm--line-height: 1.25rem;
+  --text-label-sm--letter-spacing: -0.02em;
+  --text-label-sm--font-weight: 500;
+  --text-mono-eyebrow: 0.75rem;
+  --text-mono-eyebrow--line-height: 1rem;
+  --text-mono-eyebrow--font-weight: 500;
+  --text-body-lg: 1rem;
+  --text-body-lg--line-height: 1.5rem;
+  --text-body-md: 0.875rem;
+  --text-body-md--line-height: 1.25rem;
+  --text-body-sm: 0.75rem;
+  --text-body-sm--line-height: 1rem;
+  --text-button-lg: 1rem;
+  --text-button-lg--line-height: 1.25rem;
+  --text-button-lg--font-weight: 500;
+  --text-button-md: 0.875rem;
+  --text-button-md--line-height: 1.25rem;
+  --text-button-md--font-weight: 500;
+  --text-code: 0.875rem;
+  --text-code--line-height: 1.25rem;
+
+  --spacing: 0.25rem;
+  --spacing-xxs: 0.25rem;
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 2.5rem;
+  --spacing-3xl: 4rem;
+  --spacing-4xl: 6rem;
+  --spacing-section: 8rem;
+
+  --radius-none: 0px;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-pill-category: 4rem;
+  --radius-pill: 6.25rem;
+  --radius-full: 9999px;
+}
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-body-md text-body antialiased;
   }
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }
