@@ -21,5 +21,7 @@ test('no external requests when opening the home page', async ({ page }) => {
   const loadedFamilies = await page.evaluate(() =>
     [...document.fonts].filter((face) => face.status === 'loaded').map((face) => face.family),
   )
-  expect(loadedFamilies.map((family) => family.replace(/["']/g, ''))).toContain('Geist Variable')
+  expect(loadedFamilies.map((family) => family.replace(/["']/g, ''))).toEqual(
+    expect.arrayContaining(['Geist Variable', 'Geist Mono Variable']),
+  )
 })

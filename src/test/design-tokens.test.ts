@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import css from '../index.css?raw'
 import { themeVariables, tokensOf, type TokenGroup } from './theme'
 
 // Token names defined by DESIGN.md (getdesign, vercel). DESIGN.md is not versioned,
@@ -17,6 +18,19 @@ const designTokens: Record<Exclude<TokenGroup, 'font'>, string[]> = {
   ],
   spacing: ['xxs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', 'section'],
   radius: ['none', 'sm', 'md', 'lg', 'pill-category', 'pill', 'full'],
+}
+
+// Original DESIGN.md values of the colors used as text.
+const designTextColors: Record<string, string> = {
+  ink: '#171717',
+  body: '#4d4d4d',
+  mute: '#8f8f8f',
+  faint: '#a1a1a1',
+  link: '#0070f3',
+  'link-deep': '#0761d1',
+  error: '#ee0000',
+  'error-deep': '#c50000',
+  'warning-deep': '#ab570a',
 }
 
 function luminance(hex: string): number {
@@ -48,7 +62,7 @@ describe('design tokens', () => {
       expect(tokensOf(group as TokenGroup), group).toEqual(expect.arrayContaining(names))
     }
     expect(themeVariables.get('font-sans')).toMatch(/^'Geist Variable'/)
-    expect(themeVariables.get('font-mono')).toMatch(/^'Geist Mono'/)
+    expect(themeVariables.get('font-mono')).toMatch(/^'Geist Mono Variable'/)
   })
 
   it.each(textTokens.flatMap((text) => textSurfaces.map((surface) => [text, surface])))(
@@ -60,6 +74,20 @@ describe('design tokens', () => {
 
   it('contrast: on-primary on primary is at least 4.5:1', () => {
     expect(contrast('on-primary', 'primary')).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('lists every adjusted token for the README', () => {
+    const listed = new Map(
+      [...css.matchAll(/^ \*\s+([a-z-]+)\s+(#[0-9a-f]{6}) -> (#[0-9a-f]{6})/gm)].map(
+        ([, name, from, to]) => [name, [from, to]],
+      ),
+    )
+    const adjusted = Object.entries(designTextColors)
+      .filter(([name, original]) => color(name) !== original)
+      .map(([name, original]) => [name, [original, color(name)]])
+
+    expect(adjusted.length).toBeGreaterThan(0)
+    expect(listed).toEqual(new Map(adjusted as [string, string[]][]))
   })
 
   it.each(textSurfaces)('contrast: focus ring on %s is at least 3:1', (surface) => {
