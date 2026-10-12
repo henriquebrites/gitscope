@@ -9,7 +9,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test/setup.ts'],
-    // Theme tests read the raw @theme block; every other CSS import stays empty in tests.
-    css: { include: [/src\/index\.css\?raw$/] },
+    // Theme tests read the raw theme and compile classes with Tailwind; every other CSS import
+    // stays empty in tests.
+    css: { include: [/src\/index\.css\?raw$/, /tailwindcss\/index\.css\?raw$/] },
   },
 })
