@@ -4,7 +4,7 @@ import { themeVariables, tokensOf, type TokenGroup } from './theme'
 
 // Token names defined by DESIGN.md (getdesign, vercel). DESIGN.md is not versioned,
 // so the names are pinned here.
-const designTokens: Record<Exclude<TokenGroup, 'font'>, string[]> = {
+const designTokens: Record<Exclude<TokenGroup, 'font' | 'spacing'>, string[]> = {
   color: [
     'primary', 'on-primary', 'ink', 'body', 'mute', 'faint', 'hairline', 'hairline-soft',
     'canvas', 'canvas-elevated', 'link', 'link-deep', 'link-soft', 'error', 'error-deep',
@@ -16,7 +16,6 @@ const designTokens: Record<Exclude<TokenGroup, 'font'>, string[]> = {
     'display-xl', 'heading-lg', 'heading-md', 'label-sm', 'mono-eyebrow', 'body-lg',
     'body-md', 'body-sm', 'button-lg', 'button-md', 'code',
   ],
-  spacing: ['xxs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', 'section'],
   radius: ['none', 'sm', 'md', 'lg', 'pill-category', 'pill', 'full'],
 }
 
@@ -61,6 +60,10 @@ describe('design tokens', () => {
     for (const [group, names] of Object.entries(designTokens)) {
       expect(tokensOf(group as TokenGroup), group).toEqual(expect.arrayContaining(names))
     }
+    // Spacing uses Tailwind's numeric scale on DESIGN.md's 4px base unit; named spacing
+    // tokens would shadow named widths (max-w-md would become a spacing value).
+    expect(themeVariables.get('spacing')).toBe('0.25rem')
+    expect(tokensOf('spacing')).toEqual([])
     expect(themeVariables.get('font-sans')).toMatch(/^'Geist Variable'/)
     expect(themeVariables.get('font-mono')).toMatch(/^'Geist Mono Variable'/)
   })
