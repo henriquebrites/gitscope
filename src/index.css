@@ -2,7 +2,8 @@
 
 /*
  * Tokens from DESIGN.md (Vercel / Geist), mapped to the Tailwind v4 theme.
- * Text tokens adjusted to reach WCAG AA (4.5:1) on canvas, canvas-elevated and hairline-soft:
+ * Tokens adjusted from DESIGN.md (all are text colors raised to WCAG AA 4.5:1 on canvas,
+ * canvas-elevated and hairline-soft):
  *   mute       #8f8f8f -> #636363
  *   faint      #a1a1a1 -> #6b6b6b
  *   link       #0070f3 -> #0761d1 (the original link-deep)
