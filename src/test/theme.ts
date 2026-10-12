@@ -2,7 +2,13 @@ import css from '../index.css?raw'
 
 export type TokenGroup = 'color' | 'font' | 'text' | 'spacing' | 'radius'
 
-const themeBlock = css.match(/@theme\s*{([\s\S]*?)\n}/)?.[1] ?? ''
+/** Body of the `@theme` block in src/index.css. */
+export const themeBlock = css.match(/@theme\s*{([\s\S]*?)\n}/)?.[1] ?? ''
+
+/** Utility classes applied with `@apply` in src/index.css (the base layer). */
+export const appliedClasses: string[] = [...css.matchAll(/@apply\s+([^;]+);/g)].flatMap(
+  ([, list]) => list.trim().split(/\s+/),
+)
 
 /** Theme variables declared in src/index.css, e.g. `color-ink` -> `#171717`. */
 export const themeVariables: ReadonlyMap<string, string> = new Map(

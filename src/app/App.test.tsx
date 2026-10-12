@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { spacingReport } from '../test/spacing'
-import { tokensOf } from '../test/theme'
+import { appliedClasses, tokensOf } from '../test/theme'
 import App from './App'
 
 function usedClasses(container: HTMLElement): string[] {
   return [container, ...container.querySelectorAll('*')].flatMap((element) =>
-    [...element.classList].map((name) => name.replace(/^.*:/, '')),
+    [...element.classList].map((name) => name.replace(/^(?:[^[\]:]+:)+/, '')),
   )
 }
 
@@ -30,7 +30,7 @@ describe('App', () => {
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
     expect(usesToken(classes, ['font'], tokensOf('font')), 'font family').toBe(true)
-    const { spacing, offScale } = await spacingReport(classes)
+    const { spacing, offScale } = await spacingReport([...classes, ...appliedClasses])
     expect(spacing.length, 'spacing').toBeGreaterThan(0)
     expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])
     expect(usesToken(classes, ['rounded'], tokensOf('radius')), 'radius').toBe(true)
