@@ -20,17 +20,17 @@ const designTokens: Record<Exclude<TokenGroup, 'font'>, string[]> = {
   radius: ['none', 'sm', 'md', 'lg', 'pill-category', 'pill', 'full'],
 }
 
-// Original DESIGN.md values of the colors used as text.
-const designTextColors: Record<string, string> = {
-  ink: '#171717',
-  body: '#4d4d4d',
-  mute: '#8f8f8f',
-  faint: '#a1a1a1',
-  link: '#0070f3',
-  'link-deep': '#0761d1',
-  error: '#ee0000',
-  'error-deep': '#c50000',
-  'warning-deep': '#ab570a',
+// Original DESIGN.md color values; any token declared with another value must be listed.
+const designColors: Record<string, string> = {
+  primary: '#171717', 'on-primary': '#ffffff', ink: '#171717', body: '#4d4d4d',
+  mute: '#8f8f8f', faint: '#a1a1a1', hairline: '#ebebeb', 'hairline-soft': '#f2f2f2',
+  canvas: '#fafafa', 'canvas-elevated': '#ffffff', link: '#0070f3', 'link-deep': '#0761d1',
+  'link-soft': '#d3e5ff', error: '#ee0000', 'error-deep': '#c50000', warning: '#f5a623',
+  'warning-soft': '#ffefcf', 'warning-deep': '#ab570a', violet: '#7928ca',
+  'violet-soft': '#d8ccf1', cyan: '#50e3c2', 'cyan-soft': '#aaffec', pink: '#ff0080',
+  magenta: '#eb367f', 'gradient-develop-start': '#007cf0', 'gradient-develop-end': '#00dfd8',
+  'gradient-preview-start': '#7928ca', 'gradient-preview-end': '#ff0080',
+  'gradient-ship-start': '#ff4d4d', 'gradient-ship-end': '#f9cb28',
 }
 
 function luminance(hex: string): number {
@@ -82,7 +82,7 @@ describe('design tokens', () => {
         ([, name, from, to]) => [name, [from, to]],
       ),
     )
-    const adjusted = Object.entries(designTextColors)
+    const adjusted = Object.entries(designColors)
       .filter(([name, original]) => color(name) !== original)
       .map(([name, original]) => [name, [original, color(name)]])
 
