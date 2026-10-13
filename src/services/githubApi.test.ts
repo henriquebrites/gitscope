@@ -129,7 +129,10 @@ describe('getUser', () => {
     it('without a numeric retry-after shows no time', async () => {
       fetchSpy.mockResolvedValue(jsonResponse({ message: 'secondary rate limit' }, 403, { 'retry-after': 'soon' }))
 
-      expect(await failureOf(getUser('octocat'))).toEqual({ kind: 'rate-limited' })
+      const error = await failureOf(getUser('octocat'))
+
+      expect(error).toEqual({ kind: 'rate-limited' })
+      expect(error).not.toHaveProperty('resetAt')
     })
   })
 
