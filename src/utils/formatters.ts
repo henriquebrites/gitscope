@@ -10,3 +10,10 @@ export function formatCount(value: number): string {
 export function formatTime(date: Date): string {
   return timeFormat.format(date)
 }
+
+const dateFormat = new Intl.DateTimeFormat('pt-BR')
+
+/** ISO timestamp -> local date as `dd/mm/aaaa`. */
+export function formatDate(iso: string): string {
+  return dateFormat.format(new Date(iso))
+}
