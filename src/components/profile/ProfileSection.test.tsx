@@ -63,6 +63,7 @@ describe('ProfileSection', () => {
     const alert = within(section).getByRole('alert')
     expect(within(alert).getByRole('heading', { name: title })).toBeVisible()
     expect(within(section).queryByTestId('profile-skeleton')).not.toBeInTheDocument()
+    expect(liveRegion(section)).toHaveTextContent(/^$/)
   })
 
   it.each(states)('spacing and tokens in the %s state', async (_name, result) => {
@@ -72,6 +73,11 @@ describe('ProfileSection', () => {
 
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
+    // Typography comes only from DESIGN.md tokens: no stock sizes, weights or tracking on top.
+    const stockTypography = classes.filter((name) =>
+      /^(?:text-(?:xs|sm|base|lg|[2-9]?xl)|font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)|tracking-|leading-)/.test(name),
+    )
+    expect(stockTypography, 'typography off the DESIGN.md tokens').toEqual([])
     const { spacing, offScale } = await spacingReport(rawClasses)
     expect(spacing.length, 'spacing').toBeGreaterThan(0)
     expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])

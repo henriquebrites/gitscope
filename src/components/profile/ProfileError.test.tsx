@@ -55,11 +55,12 @@ describe('ProfileError', () => {
     expect(within(alert).queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('unexpected shows a generic message with retry and no status code', () => {
-    const { alert } = renderError({ kind: 'unexpected', status: 503 })
+  it('unexpected shows a generic message with retry and no status code', async () => {
+    const { alert, onRetry } = renderError({ kind: 'unexpected', status: 503 })
 
     expect(within(alert).getByRole('heading', { name: 'Algo deu errado' })).toBeVisible()
-    expect(within(alert).getByRole('button', { name: 'Tentar novamente' })).toBeVisible()
     expect(alert.textContent).not.toContain('503')
+    await userEvent.setup().click(within(alert).getByRole('button', { name: 'Tentar novamente' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
   })
 })

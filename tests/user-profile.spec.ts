@@ -92,6 +92,18 @@ for (const state of states) {
   })
 }
 
+test('loading: skeleton in the profile area, no horizontal scroll at 320', async ({ page }) => {
+  await page.setViewportSize(mobile)
+  await stubGitHub(page, () => new Promise<void>(() => {}))
+  await page.goto('/users/octocat')
+
+  const area = page.getByRole('region', { name: 'Perfil' })
+  await expect(area.getByTestId('profile-skeleton')).toBeVisible()
+  await expect(area.locator('[aria-live="polite"]')).toHaveText('Carregando perfil…')
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
+  expect(scrollWidth).toBeLessThanOrEqual(320)
+})
+
 test('refresh refetches the profile: the cache lives only in memory', async ({ page }) => {
   const users = await stubGitHub(page)
 

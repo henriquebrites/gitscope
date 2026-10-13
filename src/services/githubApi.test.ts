@@ -122,6 +122,30 @@ describe('getUser', () => {
     expect(reason).not.toBeInstanceOf(GitHubApiError)
   })
 
+  it('maps an unreadable body to unexpected with its status', async () => {
+    fetchSpy.mockResolvedValue(new Response('<html>not json</html>', { status: 200 }))
+
+    expect(await failureOf(getUser('octocat'))).toEqual({ kind: 'unexpected', status: 200 })
+  })
+
+  it('abort while reading the body is not a domain error', async () => {
+    const controller = new AbortController()
+    const aborted = abortError()
+    const response = jsonResponse(octocat)
+    vi.spyOn(response, 'json').mockImplementation(async () => {
+      controller.abort()
+      throw aborted
+    })
+    fetchSpy.mockResolvedValue(response)
+
+    const reason = await getUser('octocat', controller.signal).then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    expect(reason).toBe(aborted)
+  })
+
   it.each([
     [500, {}],
     [403, { 'x-ratelimit-remaining': '12' }],

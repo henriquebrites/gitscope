@@ -21,11 +21,11 @@ function ProfileCard({ profile }: { profile: Profile }) {
         <dl className="flex flex-wrap gap-x-6 gap-y-2 text-body-md">
           <div className="flex gap-1">
             <dt className="text-mute">Seguidores</dt>
-            <dd className="font-medium text-ink">{formatCount(followers)}</dd>
+            <dd className="text-label-sm text-ink">{formatCount(followers)}</dd>
           </div>
           <div className="flex gap-1">
             <dt className="text-mute">Seguindo</dt>
-            <dd className="font-medium text-ink">{formatCount(following)}</dd>
+            <dd className="text-label-sm text-ink">{formatCount(following)}</dd>
           </div>
         </dl>
         <p className={`text-body-md break-words ${bio ? 'text-body' : 'text-mute'}`}>

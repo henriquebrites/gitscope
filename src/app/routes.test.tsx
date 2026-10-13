@@ -132,6 +132,8 @@ describe('routes', () => {
     expect(router.state.location.search).toBe('')
     // The search only navigates; the request that follows is the profile route's, for that login.
     expect(fetchSpy).toHaveBeenLastCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
+    // One request per profile visited (x, octocat, a b/c); the search adds none of its own.
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
   it('field starts empty after navigation', async () => {

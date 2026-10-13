@@ -66,6 +66,17 @@ describe('useProfile', () => {
     )
   })
 
+  it('maps an error outside the domain to unexpected', async () => {
+    const response = jsonResponse(octocat)
+    vi.spyOn(response, 'json').mockResolvedValue(null)
+    fetchSpy.mockResolvedValue(response)
+    const { result } = renderHook(() => useProfile('octocat'), { wrapper })
+
+    await waitFor(() =>
+      expect(result.current.result).toEqual({ status: 'error', error: { kind: 'unexpected' } }),
+    )
+  })
+
   it('aborts on login change and discards the late answer', async () => {
     const a = deferred<Response>()
     const b = deferred<Response>()
