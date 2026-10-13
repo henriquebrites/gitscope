@@ -77,6 +77,18 @@ describe('useRepositories', () => {
     )
   })
 
+  it('maps an error outside the domain to unexpected', async () => {
+    // A null entry makes the normalisation throw a TypeError, not a GitHubApiError.
+    fetchSpy.mockImplementation(async (url: string) =>
+      isRepositoriesUrl(url) ? jsonResponse([null]) : githubFetch()(url),
+    )
+    const { result } = renderHook(() => useUserPage({ current: 'octocat' }), { wrapper })
+
+    await waitFor(() =>
+      expect(result.current.result).toEqual({ status: 'error', error: { kind: 'unexpected' } }),
+    )
+  })
+
   it('cache hit: repositories loaded before are served without a request', async () => {
     fetchSpy.mockImplementation(githubFetch({ octocat: repositoriesOf('a', 3) }))
     const logins = { current: 'octocat' }

@@ -4,7 +4,7 @@ import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { deferred, githubFetch, isRepositoriesUrl, jsonResponse, octocat } from '../test/github'
+import { deferred, githubFetch, jsonResponse, octocat } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -123,10 +123,13 @@ describe('routes', () => {
   it('navigates to the profile without query', async () => {
     const user = userEvent.setup()
     const { router } = renderAt('/users/x?sort=name-asc&page=2')
+    // Each profile settles (profile, then its empty repositories) before the next search.
+    await screen.findByText('Esta conta não tem repositórios públicos.')
 
     await user.type(searchField(), '  octocat  {Enter}')
     expect(router.state.location.pathname).toBe('/users/octocat')
     expect(router.state.location.search).toBe('')
+    await screen.findByText('Esta conta não tem repositórios públicos.')
 
     await user.type(searchField(), 'a b/c{Enter}')
     expect(router.state.location.pathname).toBe('/users/a%20b%2Fc')
@@ -139,15 +142,17 @@ describe('routes', () => {
       ),
     )
     expect(fetchSpy).toHaveBeenCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
-    // One profile request per profile visited (x, octocat, a b/c); the search adds none of its
-    // own. Repositories follow only the profiles that loaded while their route was current.
-    const urls = fetchSpy.mock.calls.map(([url]) => url as string)
-    expect(urls.filter((url) => !isRepositoriesUrl(url))).toEqual([
+    // Per profile visited (x, octocat, a b/c): its profile, then its repositories. The search
+    // adds no request of its own.
+    expect(fetchSpy.mock.calls.map(([url]) => url as string)).toEqual([
       'https://api.github.com/users/x',
+      'https://api.github.com/users/x/repos?per_page=100&page=1',
       'https://api.github.com/users/octocat',
+      'https://api.github.com/users/octocat/repos?per_page=100&page=1',
       'https://api.github.com/users/a%20b%2Fc',
+      'https://api.github.com/users/a%20b%2Fc/repos?per_page=100&page=1',
     ])
-    expect(fetchSpy).toHaveBeenCalledTimes(3 + urls.filter(isRepositoriesUrl).length)
+    expect(fetchSpy).toHaveBeenCalledTimes(6)
   })
 
   it('field starts empty after navigation', async () => {

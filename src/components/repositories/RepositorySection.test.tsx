@@ -203,6 +203,19 @@ describe('RepositorySection', () => {
 
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
+    // Colour comes only from DESIGN.md tokens: every bg-/text-/border- class that is not a
+    // type size or a border width names a colour token.
+    const colors = new Set(tokensOf('color'))
+    const textSizes = new Set(tokensOf('text'))
+    const offTokenColors = classes.filter((name) => {
+      const match = /^(bg|text|border)-(.+)$/.exec(name)
+      if (!match) return false
+      const [, prefix, value] = match
+      if (prefix === 'text' && (textSizes.has(value) || /^(?:left|center|right|justify|wrap|nowrap|balance|pretty|ellipsis|clip)$/.test(value))) return false
+      if (prefix === 'border' && /^(?:[trblxyse]|[trblxyse]-\d+|\d+|solid|dashed|dotted|double|none|hidden)$/.test(value)) return false
+      return !colors.has(value)
+    })
+    expect(offTokenColors, 'colour off the DESIGN.md tokens').toEqual([])
     // Typography comes only from DESIGN.md tokens, as in ProfileSection.
     const stockTypography = classes.filter((name) =>
       /^(?:text-(?:xs|sm|base|lg|[2-9]?xl|\[)|font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[)|tracking-|leading-)/.test(name),
