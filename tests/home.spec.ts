@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './support/test.js'
 
 const localHosts = new Set(['localhost', '127.0.0.1'])
 
