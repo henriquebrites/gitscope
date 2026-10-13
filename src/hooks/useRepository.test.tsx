@@ -1,8 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useGitHub } from '../context/GitHubContext'
 import GitHubProvider from '../context/GitHubProvider'
-import { abortError, deferred, helloWorld, jsonResponse } from '../test/github'
+import { abortError, deferred, helloWorld, jsonResponse, octocat, repositoryOf } from '../test/github'
+import type { Repository } from '../types/github'
 import { useRepository } from './useRepository'
 
 let fetchSpy: ReturnType<typeof vi.fn>
@@ -23,7 +25,6 @@ function signalOf(call: number): AbortSignal {
   return (fetchSpy.mock.calls[call][1] as RequestInit).signal as AbortSignal
 }
 
-const repositoryOf = (name: string) => ({ ...helloWorld, name, full_name: `octocat/${name}` })
 
 describe('useRepository', () => {
   it('loads from the API: loading, then success with one request', async () => {
@@ -111,5 +112,68 @@ describe('useRepository', () => {
     expect(result.current.result).toEqual({ status: 'loading' })
     await waitFor(() => expect(result.current.result).toEqual({ status: 'success', repository: helloWorld }))
     expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  describe('session cache', () => {
+    /** Renders the hook after the session cached `octocat`'s profile and, if given, repositories. */
+    function renderCached(repoName: { current: string }, repositories?: Repository[]) {
+      const view = renderHook(
+        () => ({ detail: useRepository('OctoCat', repoName.current), github: useGitHub() }),
+        { wrapper },
+      )
+      act(() => {
+        const { dispatch } = view.result.current.github
+        dispatch({ type: 'profile/requested', key: 'octocat' })
+        dispatch({ type: 'profile/loaded', key: 'octocat', profile: octocat })
+        if (repositories) {
+          dispatch({ type: 'repos/requested', key: 'octocat' })
+          dispatch({ type: 'repos/loaded', key: 'octocat', repositories })
+        }
+      })
+      return view
+    }
+
+    // The hook mounts on another repository first, so the cache is filled before the switch.
+    it.each(['Hello-World', 'hello-world', 'HELLO-WORLD'])(
+      'cache hit: %s in the cached list is served without a request',
+      (name) => {
+        const repoName = { current: 'repo-a' }
+        fetchSpy.mockReturnValue(deferred<Response>().promise)
+        const { result, rerender } = renderCached(repoName, [repositoryOf('other'), helloWorld])
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+
+        repoName.current = name
+        rerender()
+
+        expect(result.current.detail.result).toEqual({ status: 'success', repository: helloWorld })
+        expect(fetchSpy).toHaveBeenCalledTimes(1)
+      },
+    )
+
+    it('cache miss: a repository missing from the cached list is requested', async () => {
+      // A fresh response per call: the first one, for hello-world, is made before the cache fills.
+      fetchSpy.mockImplementation(async () => jsonResponse(repositoryOf('elsewhere')))
+      const repoName = { current: 'hello-world' }
+      const { result, rerender } = renderCached(repoName, [helloWorld])
+      const before = fetchSpy.mock.calls.length
+
+      repoName.current = 'elsewhere'
+      rerender()
+
+      expect(result.current.detail.result).toEqual({ status: 'loading' })
+      expect(fetchSpy.mock.calls.length).toBe(before + 1)
+      expect(fetchSpy.mock.lastCall?.[0]).toBe('https://api.github.com/repos/OctoCat/elsewhere')
+      await waitFor(() =>
+        expect(result.current.detail.result).toMatchObject({ status: 'success', repository: { name: 'elsewhere' } }),
+      )
+    })
+
+    it('cache miss: a cached profile without repositories is requested', async () => {
+      fetchSpy.mockResolvedValue(jsonResponse(helloWorld))
+      const { result } = renderCached({ current: 'Hello-World' })
+
+      await waitFor(() => expect(result.current.detail.result).toEqual({ status: 'success', repository: helloWorld }))
+      expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual(['https://api.github.com/repos/OctoCat/Hello-World'])
+    })
   })
 })
