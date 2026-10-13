@@ -13,8 +13,9 @@ import {
 const mobile = { width: 320, height: 480 }
 const desktop = { width: 1280, height: 800 }
 
-const longName = 'repositorio-com-um-nome-de-uma-unica-palavra-extremamente-comprido-para-quebrar'
-const longText = 'Descricao-de-repositorio-com-uma-unica-palavra-muito-comprida-sem-espacos '.repeat(4)
+// No spaces or hyphens: only `break-words` can keep these inside 320 px.
+const longName = 'repositorio'.repeat(10)
+const longText = 'descricao'.repeat(35)
 
 interface DetailState {
   name: string
@@ -28,6 +29,11 @@ const states: DetailState[] = [
     name: 'long name and description',
     handler: (route) => json(route, repositoryOf(longName, { description: longText })),
     heading: longName,
+  },
+  {
+    name: 'null description and language',
+    handler: (route) => json(route, repositoryOf('sem-dados', { description: null, language: null })),
+    heading: 'sem-dados',
   },
   {
     name: 'not-found',

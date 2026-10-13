@@ -101,7 +101,7 @@ describe('RepositoryDetailSection', () => {
   })
 
   describe('request errors', () => {
-    it.each(['click', 'Enter'])('network: message and retry by %s', async (how) => {
+    it.each(['click', 'Enter', 'Space'])('network: message and retry by %s', async (how) => {
       const onRetry = vi.fn()
       const { section } = renderSection({ status: 'error', error: { kind: 'network' } }, onRetry)
 
@@ -113,7 +113,7 @@ describe('RepositoryDetailSection', () => {
       if (how === 'click') await user.click(button)
       else {
         button.focus()
-        await user.keyboard('{Enter}')
+        await user.keyboard(how === 'Enter' ? '{Enter}' : ' ')
       }
       expect(onRetry).toHaveBeenCalledTimes(1)
     })
