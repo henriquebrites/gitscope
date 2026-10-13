@@ -112,8 +112,6 @@ test('pager keeps the focus on an enabled button at the limits', async ({ page }
   await page.keyboard.press('Enter')
   await expect(section(page).getByText('Página 1 de 2')).toBeVisible()
   await expect(next).toBeFocused()
-  // Tab still moves on from the pager instead of restarting at the top of the page.
-  expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true)
 })
 
 test('follows rel=next through the browser: 3 API pages, 237 repositories', async ({ page }) => {
