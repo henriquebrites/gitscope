@@ -99,7 +99,7 @@ describe('route errors', () => {
   // The ring comes from the global :focus-visible rule in src/index.css (proven in the browser
   // by tests/app-shell.spec.ts); these screens cannot be crashed in the preview build, so this
   // proves no focusable on them opts out of that rule.
-  it.each(errorScreens)('focus ring rule reaches every focusable on the %s screen', async (_name, part, path) => {
+  it.each(errorScreens)('focus ring rule reaches every focusable, in header-first order, on the %s screen', async (_name, part, path) => {
     crash[part] = true
     const { container } = renderAt(path)
     await screen.findByRole('alert')
@@ -111,7 +111,22 @@ describe('route errors', () => {
         /(^|:)(outline|ring)(-|$)|(^|:)focus(-visible|-within)?:/.test(name),
       )
       expect(overrides, element.outerHTML).toEqual([])
-      expect(element.tabIndex, element.outerHTML).toBeGreaterThanOrEqual(0)
+      // 0, never positive: a positive tabindex would jump ahead of the header.
+      expect(element.tabIndex, element.outerHTML).toBe(0)
+    }
+
+    // Tab follows document order, so header focusables must precede the error's own.
+    const alertFocusables = focusables.filter((element) => element.closest('[role="alert"]'))
+    expect(alertFocusables.length).toBeGreaterThan(0)
+    const banner = container.querySelector('header')
+    if (part === 'page') expect(banner).not.toBeNull()
+    for (const headerElement of banner ? focusables.filter((element) => banner.contains(element)) : []) {
+      for (const errorElement of alertFocusables) {
+        expect(
+          headerElement.compareDocumentPosition(errorElement) & Node.DOCUMENT_POSITION_FOLLOWING,
+          errorElement.outerHTML,
+        ).toBeTruthy()
+      }
     }
   })
 })
