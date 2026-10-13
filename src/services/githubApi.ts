@@ -79,7 +79,7 @@ export async function getUser(login: string, signal?: AbortSignal): Promise<Prof
   }
 }
 
-const REPOSITORIES_PER_PAGE = 100
+const API_PAGE_SIZE = 100
 
 // `link: <…?page=2>; rel="next", <…?page=3>; rel="last"`; GitHub omits it on a single page.
 function hasNextPage(headers: Headers): boolean {
@@ -114,7 +114,7 @@ export async function getRepositories(
   for (let page = 1; ; page += 1) {
     onPage?.(page)
     const { body, headers } = await request<Repository[]>(
-      `/users/${encodeURIComponent(login)}/repos?per_page=${REPOSITORIES_PER_PAGE}&page=${page}`,
+      `/users/${encodeURIComponent(login)}/repos?per_page=${API_PAGE_SIZE}&page=${page}`,
       signal,
     )
     // A response that ignored the abort must not lead to the next page.
