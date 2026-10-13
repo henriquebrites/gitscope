@@ -42,3 +42,6 @@ skills-lock.json
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Lighthouse reports
+/lighthouse/
