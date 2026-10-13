@@ -2,7 +2,14 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { abortError, deferred, jsonResponse, octocat, profileOf } from '../test/github'
+import {
+  abortError,
+  deferred,
+  githubFetch,
+  isRepositoriesUrl,
+  jsonResponse,
+  profileOf,
+} from '../test/github'
 import { routes } from './routes'
 
 let fetchSpy: ReturnType<typeof vi.fn>
@@ -27,6 +34,7 @@ function renderAt(path: string) {
 const main = () => screen.getByRole('main')
 const profileArea = () => within(main()).getByRole('region', { name: 'Perfil' })
 const requestedUrls = () => fetchSpy.mock.calls.map(([url]) => url as string)
+const profileUrls = () => requestedUrls().filter((url) => !isRepositoriesUrl(url))
 const signalOf = (call: number) => (fetchSpy.mock.calls[call][1] as RequestInit).signal as AbortSignal
 
 async function search(login: string) {
@@ -38,7 +46,7 @@ async function search(login: string) {
 
 describe('user profile route', () => {
   it('shows the profile from the API', async () => {
-    fetchSpy.mockResolvedValue(jsonResponse(octocat))
+    fetchSpy.mockImplementation(githubFetch())
     renderAt('/users/octocat')
 
     expect(await within(main()).findByRole('heading', { level: 1, name: 'octocat' })).toBeVisible()
@@ -46,12 +54,19 @@ describe('user profile route', () => {
     expect(
       within(main()).getByRole('link', { name: 'Ver perfil no GitHub (abre em nova aba)' }),
     ).toHaveAttribute('href', 'https://github.com/octocat')
-    expect(requestedUrls()).toEqual(['https://api.github.com/users/octocat'])
+    // The repositories follow the profile (T3).
+    expect(await within(main()).findByText('Esta conta não tem repositórios públicos.')).toBeVisible()
+    expect(requestedUrls()).toEqual([
+      'https://api.github.com/users/octocat',
+      'https://api.github.com/users/octocat/repos?per_page=100&page=1',
+    ])
   })
 
   it('shows no previous user while loading the next one', async () => {
     const next = deferred<Response>()
-    fetchSpy.mockResolvedValueOnce(jsonResponse(profileOf('alpha'))).mockReturnValueOnce(next.promise)
+    fetchSpy.mockImplementation(async (url: string) =>
+      url === 'https://api.github.com/users/beta' ? next.promise : githubFetch()(url),
+    )
     renderAt('/users/alpha')
     await within(main()).findByRole('heading', { level: 1, name: 'alpha' })
 
@@ -69,7 +84,10 @@ describe('user profile route', () => {
   it('aborts and discards the previous user', async () => {
     const a = deferred<Response>()
     const b = deferred<Response>()
-    fetchSpy.mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise)
+    fetchSpy
+      .mockReturnValueOnce(a.promise)
+      .mockReturnValueOnce(b.promise)
+      .mockImplementation(githubFetch())
     const router = renderAt('/users/a')
 
     await act(() => router.navigate('/users/b'))
@@ -101,19 +119,21 @@ describe('user profile route', () => {
   })
 
   it('serves a visited profile from the cache', async () => {
-    fetchSpy.mockImplementation(async (url: string) =>
-      jsonResponse(url.endsWith('/octocat') ? octocat : profileOf('other')),
-    )
+    fetchSpy.mockImplementation(githubFetch())
     renderAt('/users/OctoCat')
     await within(main()).findByRole('heading', { level: 1, name: 'octocat' })
+    await within(main()).findByText('Esta conta não tem repositórios públicos.')
     await search('other')
     await within(main()).findByRole('heading', { level: 1, name: 'other' })
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    await within(main()).findByText('Esta conta não tem repositórios públicos.')
+    expect(profileUrls()).toHaveLength(2)
+    // Profile and repositories of each user.
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
 
     await search('octocat')
 
     expect(within(main()).getByRole('heading', { level: 1, name: 'octocat' })).toBeVisible()
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
   })
 
   it('not found keeps the search available', async () => {
@@ -128,7 +148,7 @@ describe('user profile route', () => {
   })
 
   it('retries only on request', async () => {
-    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue(jsonResponse(octocat))
+    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockImplementation(githubFetch())
     renderAt('/users/octocat')
 
     const alert = await within(profileArea()).findByRole('alert')
@@ -139,7 +159,9 @@ describe('user profile route', () => {
     await userEvent.setup().click(within(alert).getByRole('button', { name: 'Tentar novamente' }))
 
     expect(await within(main()).findByRole('heading', { level: 1, name: 'octocat' })).toBeVisible()
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(profileUrls()).toHaveLength(2)
+    // The profile twice, then its repositories once.
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3))
   })
 
   it('never retries a rate limit', async () => {

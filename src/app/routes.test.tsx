@@ -1,10 +1,10 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { deferred, jsonResponse, octocat } from '../test/github'
+import { deferred, githubFetch, isRepositoriesUrl, jsonResponse, octocat } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -55,8 +55,9 @@ function allRoutes(list: RouteObject[]): RouteObject[] {
 let fetchSpy: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  // The profile route requests its user; every test answers with octocat unless it says otherwise.
-  fetchSpy = vi.fn(async () => jsonResponse(octocat))
+  // The profile route requests its user, then its repositories; every user mirrors octocat
+  // and has none unless a test says otherwise.
+  fetchSpy = vi.fn(githubFetch())
   vi.stubGlobal('fetch', fetchSpy)
 })
 
@@ -130,10 +131,23 @@ describe('routes', () => {
     await user.type(searchField(), 'a b/c{Enter}')
     expect(router.state.location.pathname).toBe('/users/a%20b%2Fc')
     expect(router.state.location.search).toBe('')
-    // The search only navigates; the request that follows is the profile route's, for that login.
-    expect(fetchSpy).toHaveBeenLastCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
-    // One request per profile visited (x, octocat, a b/c); the search adds none of its own.
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    // The search only navigates; the requests that follow are the profile route's, for that login.
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenLastCalledWith(
+        'https://api.github.com/users/a%20b%2Fc/repos?per_page=100&page=1',
+        expect.anything(),
+      ),
+    )
+    expect(fetchSpy).toHaveBeenCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
+    // One profile request per profile visited (x, octocat, a b/c); the search adds none of its
+    // own. Repositories follow only the profiles that loaded while their route was current.
+    const urls = fetchSpy.mock.calls.map(([url]) => url as string)
+    expect(urls.filter((url) => !isRepositoriesUrl(url))).toEqual([
+      'https://api.github.com/users/x',
+      'https://api.github.com/users/octocat',
+      'https://api.github.com/users/a%20b%2Fc',
+    ])
+    expect(fetchSpy).toHaveBeenCalledTimes(3 + urls.filter(isRepositoriesUrl).length)
   })
 
   it('field starts empty after navigation', async () => {
