@@ -1,25 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { usedClasses, usesToken, withoutVariants } from '../test/classes'
 import { spacingReport } from '../test/spacing'
 import { appliedClasses, tokensOf } from '../test/theme'
 import App from './App'
-
-function usedClasses(container: HTMLElement): string[] {
-  return [container, ...container.querySelectorAll('*')].flatMap((element) => [
-    ...element.classList,
-  ])
-}
-
-// Token checks compare the utility itself, so responsive and state variants are dropped.
-function withoutVariants(classes: string[]): string[] {
-  return classes.map((name) => name.replace(/^(?:[^[\]():]+:)+/, ''))
-}
-
-function usesToken(classes: string[], prefixes: string[], tokens: string[]): boolean {
-  return classes.some((name) =>
-    prefixes.some((prefix) => tokens.some((token) => name === `${prefix}-${token}`)),
-  )
-}
 
 describe('App', () => {
   it('renders the home heading', () => {
