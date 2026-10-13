@@ -101,6 +101,38 @@ describe('getUser', () => {
     else expect(error).not.toHaveProperty('resetAt')
   })
 
+  describe('maps secondary rate limit', () => {
+    const now = new Date(2026, 9, 13, 14, 0)
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(now)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it.each([
+      [403, { 'retry-after': '60' }],
+      [429, { 'retry-after': '60' }],
+      [403, { 'retry-after': '60', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1791900300' }],
+    ])('waits retry-after (%i, %o)', async (status, headers) => {
+      fetchSpy.mockResolvedValue(jsonResponse({ message: 'secondary rate limit' }, status, headers))
+
+      expect(await failureOf(getUser('octocat'))).toEqual({
+        kind: 'rate-limited',
+        resetAt: new Date(now.getTime() + 60_000),
+      })
+    })
+
+    it('without a numeric retry-after shows no time', async () => {
+      fetchSpy.mockResolvedValue(jsonResponse({ message: 'secondary rate limit' }, 403, { 'retry-after': 'soon' }))
+
+      expect(await failureOf(getUser('octocat'))).toEqual({ kind: 'rate-limited' })
+    })
+  })
+
   it('maps a network failure to network', async () => {
     fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'))
 

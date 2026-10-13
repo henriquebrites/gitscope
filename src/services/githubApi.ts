@@ -23,17 +23,22 @@ function isAbort(error: unknown, signal?: AbortSignal): boolean {
   return signal?.aborted === true || (error instanceof DOMException && error.name === 'AbortError')
 }
 
-// Primary rate limit: 403 or 429 with x-ratelimit-remaining 0; the reset is in UTC epoch seconds.
+function rateLimited(resetMs: number): GitHubError {
+  return Number.isFinite(resetMs)
+    ? { kind: 'rate-limited', resetAt: new Date(resetMs) }
+    : { kind: 'rate-limited' }
+}
+
+// 403 or 429. Secondary limit: retry-after in seconds, which takes precedence. Primary limit:
+// x-ratelimit-remaining 0, with the reset in UTC epoch seconds.
 function toError(response: Response): GitHubError {
   if (response.status === 404) return { kind: 'not-found' }
-  const limited =
-    (response.status === 403 || response.status === 429) &&
-    response.headers.get('x-ratelimit-remaining') === '0'
-  if (limited) {
-    const reset = Number(response.headers.get('x-ratelimit-reset') ?? Number.NaN)
-    return Number.isFinite(reset)
-      ? { kind: 'rate-limited', resetAt: new Date(reset * 1000) }
-      : { kind: 'rate-limited' }
+  if (response.status === 403 || response.status === 429) {
+    const retryAfter = response.headers.get('retry-after')
+    if (retryAfter !== null) return rateLimited(Date.now() + Number(retryAfter) * 1000)
+    if (response.headers.get('x-ratelimit-remaining') === '0') {
+      return rateLimited(Number(response.headers.get('x-ratelimit-reset') ?? Number.NaN) * 1000)
+    }
   }
   return { kind: 'unexpected', status: response.status }
 }
