@@ -1,10 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GitHubContext } from '../context/GitHubContext'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
+import { deferred, jsonResponse, octocat } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -24,15 +24,10 @@ const screens = [
   '/foo/bar',
 ]
 
-function renderAt(path: string, isProfileLoading = false) {
+function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
-  const tree = (loading: boolean) => (
-    <GitHubContext value={{ isProfileLoading: loading }}>
-      <RouterProvider router={router} />
-    </GitHubContext>
-  )
-  const view = render(tree(isProfileLoading))
-  return { ...view, router, setLoading: (loading: boolean) => view.rerender(tree(loading)) }
+  const view = render(<RouterProvider router={router} />)
+  return { ...view, router }
 }
 
 function searchField() {
@@ -60,7 +55,8 @@ function allRoutes(list: RouteObject[]): RouteObject[] {
 let fetchSpy: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  fetchSpy = vi.fn()
+  // The profile route requests its user; every test answers with octocat unless it says otherwise.
+  fetchSpy = vi.fn(async () => jsonResponse(octocat))
   vi.stubGlobal('fetch', fetchSpy)
 })
 
@@ -83,7 +79,7 @@ describe('routes', () => {
     expect(createBrowserRouter).toHaveBeenCalledWith(routes)
   })
 
-  it('renders placeholders for the profile and the repository', async () => {
+  it('renders the profile and the repository placeholder', async () => {
     renderAt('/users/octocat')
     expect(await screen.findByRole('heading', { level: 1, name: /octocat/ })).toBeVisible()
 
@@ -101,13 +97,14 @@ describe('routes', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it.each(screens)('header search on every screen (%s)', (path) => {
+  it.each(screens)('header search on every screen (%s)', async (path) => {
     renderAt(path)
 
     const banner = screen.getByRole('banner')
     const search = within(banner).getByRole('search')
     expect(within(search).getByRole('textbox', { name: 'Nome de usuário do GitHub' })).toBeVisible()
-    expect(within(search).getByRole('button', { name: 'Buscar' })).toBeVisible()
+    // On the profile route the button reads "Buscando…" until the profile arrives.
+    expect(await within(search).findByRole('button', { name: 'Buscar' })).toBeVisible()
   })
 
   it('blank search stays put and requests nothing', async () => {
@@ -133,7 +130,8 @@ describe('routes', () => {
     await user.type(searchField(), 'a b/c{Enter}')
     expect(router.state.location.pathname).toBe('/users/a%20b%2Fc')
     expect(router.state.location.search).toBe('')
-    expect(fetchSpy).not.toHaveBeenCalled()
+    // The search only navigates; the request that follows is the profile route's, for that login.
+    expect(fetchSpy).toHaveBeenLastCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
   })
 
   it('field starts empty after navigation', async () => {
@@ -146,12 +144,14 @@ describe('routes', () => {
     expect(searchField()).toHaveValue('')
   })
 
-  it('disables search while the profile loads', () => {
-    const { setLoading } = renderAt('/users/octocat', true)
+  it('disables search while the profile loads', async () => {
+    const pending = deferred<Response>()
+    fetchSpy.mockReturnValue(pending.promise)
+    renderAt('/users/octocat')
 
     expect(screen.getByRole('button', { name: 'Buscando…' })).toBeDisabled()
 
-    setLoading(false)
+    await act(async () => pending.resolve(jsonResponse(octocat)))
     expect(screen.getByRole('button', { name: 'Buscar' })).toBeEnabled()
   })
 

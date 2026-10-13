@@ -1,55 +1,28 @@
 import { expect, test, type Page } from '@playwright/test'
+import { stubGitHub } from './support/github.js'
+import { expectFocusRing, expectVisualTabOrder, tabThrough } from './support/focus.js'
 
 const screens = ['/', '/users/octocat', '/users/octocat/repos/hello-world', '/foo/bar']
-const focusColor = 'rgb(7, 97, 209)'
 
 const mobile = { width: 320, height: 480 }
 const desktop = { width: 1280, height: 800 }
 
-interface Focused {
-  label: string
-  region: 'header' | 'main' | 'other'
-  top: number
-  bottom: number
-  left: number
-  outlineStyle: string
-  outlineWidth: number
-  outlineColor: string
+/** Every screen has a level-1 heading once its content is in; loading has none. */
+async function gotoScreen(page: Page, path: string) {
+  await page.goto(path)
+  await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible()
 }
 
-/** Presses Tab until focus leaves the page, recording every element that received focus. */
-async function tabThrough(page: Page): Promise<Focused[]> {
-  const visited: Focused[] = []
-  for (let step = 0; step < 30; step += 1) {
-    await page.keyboard.press('Tab')
-    const focused = await page.evaluate((): Focused | null => {
-      const element = document.activeElement
-      if (!element || element === document.body) return null
-      const style = getComputedStyle(element)
-      const rect = element.getBoundingClientRect()
-      return {
-        label: `${element.tagName.toLowerCase()} ${element.textContent?.trim() ?? ''}`.trim(),
-        region: element.closest('header') ? 'header' : element.closest('main') ? 'main' : 'other',
-        top: rect.top + window.scrollY,
-        bottom: rect.bottom + window.scrollY,
-        left: rect.left,
-        outlineStyle: style.outlineStyle,
-        outlineWidth: Number.parseFloat(style.outlineWidth),
-        outlineColor: style.outlineColor,
-      }
-    })
-    if (!focused) break
-    if (visited.some((seen) => seen.label === focused.label && seen.top === focused.top)) break
-    visited.push(focused)
-  }
-  return visited
-}
+// The profile route requests its user; the API is always simulated.
+test.beforeEach(async ({ page }) => {
+  await stubGitHub(page)
+})
 
 for (const path of screens) {
   test.describe(`screen ${path}`, () => {
     test('no horizontal scroll at 320', async ({ page }) => {
       await page.setViewportSize(mobile)
-      await page.goto(path)
+      await gotoScreen(page, path)
       await expect(page.getByRole('banner')).toBeVisible()
 
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
@@ -58,7 +31,7 @@ for (const path of screens) {
 
     test('stacks header above content at 320', async ({ page }) => {
       await page.setViewportSize(mobile)
-      await page.goto(path)
+      await gotoScreen(page, path)
 
       const header = await page.getByRole('banner').boundingBox()
       const main = await page.getByRole('main').boundingBox()
@@ -69,7 +42,7 @@ for (const path of screens) {
     for (const viewport of [{ width: 1024, height: 768 }, desktop]) {
       test(`caps the content width at ${viewport.width}`, async ({ page }) => {
         await page.setViewportSize(viewport)
-        await page.goto(path)
+        await gotoScreen(page, path)
 
         const box = await page.getByRole('main').boundingBox()
         expect(box).toBeTruthy()
@@ -81,34 +54,18 @@ for (const path of screens) {
     for (const viewport of [mobile, desktop]) {
       test(`focus ring on every focusable at ${viewport.width}`, async ({ page }) => {
         await page.setViewportSize(viewport)
-        await page.goto(path)
+        await gotoScreen(page, path)
 
         const visited = await tabThrough(page)
         expect(visited.length).toBeGreaterThanOrEqual(3)
-        for (const element of visited) {
-          expect(element.outlineStyle, element.label).toBe('solid')
-          expect(element.outlineWidth, element.label).toBeGreaterThanOrEqual(2)
-          expect(element.outlineColor, element.label).toBe(focusColor)
-        }
+        expectFocusRing(visited)
       })
 
       test(`tab order follows visual order at ${viewport.width}`, async ({ page }) => {
         await page.setViewportSize(viewport)
-        await page.goto(path)
+        await gotoScreen(page, path)
 
-        const visited = await tabThrough(page)
-        const regions = visited.map((element) => element.region)
-        expect(regions).not.toContain('other')
-        expect(regions.slice(regions.indexOf('main') === -1 ? regions.length : regions.indexOf('main'))).not.toContain('header')
-        expect(regions[0]).toBe('header')
-
-        for (let index = 1; index < visited.length; index += 1) {
-          const previous = visited[index - 1]
-          const current = visited[index]
-          const sameRow = current.top < previous.bottom && previous.top < current.bottom
-          if (sameRow) expect(current.left, current.label).toBeGreaterThan(previous.left)
-          else expect(current.top, current.label).toBeGreaterThan(previous.top)
-        }
+        expectVisualTabOrder(await tabThrough(page))
       })
     }
   })

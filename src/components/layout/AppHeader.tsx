@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useGitHub } from '../../context/GitHubContext'
+import { isProfileLoading } from '../../context/githubReducer'
 import SearchForm from '../search/SearchForm'
 
 function AppHeader() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isProfileLoading } = useGitHub()
+  const { state } = useGitHub()
 
   return (
     <header className="border-b border-hairline bg-canvas">
@@ -19,7 +20,7 @@ function AppHeader() {
         {/* Keyed by location so the field starts empty on every navigation. */}
         <SearchForm
           key={location.key}
-          isLoading={isProfileLoading}
+          isLoading={isProfileLoading(state)}
           onSearch={(login) => navigate(`/users/${encodeURIComponent(login)}`)}
         />
       </div>
