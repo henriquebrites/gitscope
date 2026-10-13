@@ -4,7 +4,7 @@ import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { deferred, jsonResponse, octocat } from '../test/github'
+import { deferred, helloWorld, jsonResponse, octocat } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -55,8 +55,9 @@ function allRoutes(list: RouteObject[]): RouteObject[] {
 let fetchSpy: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  // The profile route requests its user; every test answers with octocat unless it says otherwise.
-  fetchSpy = vi.fn(async () => jsonResponse(octocat))
+  // The profile route requests its user and the detail route its repository; every test answers
+  // with octocat and Hello-World unless it says otherwise.
+  fetchSpy = vi.fn(async (url: string) => jsonResponse(url.includes('/repos/') ? helloWorld : octocat))
   vi.stubGlobal('fetch', fetchSpy)
 })
 
@@ -79,13 +80,14 @@ describe('routes', () => {
     expect(createBrowserRouter).toHaveBeenCalledWith(routes)
   })
 
-  it('renders the profile and the repository placeholder', async () => {
+  it('renders the profile and the repository detail', async () => {
     renderAt('/users/octocat')
     expect(await screen.findByRole('heading', { level: 1, name: /octocat/ })).toBeVisible()
 
     const detail = within(renderAt('/users/octocat/repos/hello-world').container)
-    expect(await detail.findByRole('heading', { level: 1, name: /hello-world/ })).toBeVisible()
-    expect(detail.getByRole('main')).toHaveTextContent('octocat')
+    expect(await detail.findByRole('heading', { level: 1, name: 'Hello-World' })).toBeVisible()
+    // The detail belongs to the user in the URL: its way back goes to that user's list.
+    expect(detail.getByRole('link', { name: 'Voltar aos repositórios' })).toHaveAttribute('href', '/users/octocat')
   })
 
   it('unknown route shows not found with a link home and no request', async () => {

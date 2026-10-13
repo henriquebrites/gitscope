@@ -23,6 +23,10 @@ describe('layering', () => {
         '../components/profile/ProfileError.tsx',
         '../components/profile/ProfileSection.tsx',
         '../pages/UserPage.tsx',
+        '../pages/RepositoryPage.tsx',
+        '../components/repositories/RepositoryDetail.tsx',
+        '../components/repositories/RepositoryDetailError.tsx',
+        '../components/repositories/RepositoryDetailSection.tsx',
       ]),
     )
   })
