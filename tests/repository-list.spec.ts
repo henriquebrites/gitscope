@@ -98,6 +98,24 @@ for (const state of states.filter(({ name }) => name !== 'loading' && name !== '
   }
 }
 
+test('pager keeps the focus on an enabled button at the limits', async ({ page }) => {
+  await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 45)))
+  await page.goto('/users/octocat')
+  const next = section(page).getByRole('button', { name: 'Próxima' })
+  const previous = section(page).getByRole('button', { name: 'Anterior' })
+
+  await next.focus()
+  await page.keyboard.press('Enter')
+  await expect(section(page).getByText('Página 2 de 2')).toBeVisible()
+  await expect(previous).toBeFocused()
+
+  await page.keyboard.press('Enter')
+  await expect(section(page).getByText('Página 1 de 2')).toBeVisible()
+  await expect(next).toBeFocused()
+  // Tab still moves on from the pager instead of restarting at the top of the page.
+  expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true)
+})
+
 test('follows rel=next through the browser: 3 API pages, 237 repositories', async ({ page }) => {
   const all = repositoriesOf('r', 237)
   all[236] = repositoryOf('star-of-page-3', { stargazers_count: 9999 })

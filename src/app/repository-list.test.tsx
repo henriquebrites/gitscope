@@ -282,6 +282,34 @@ describe('repository list route', () => {
   })
 
   it.each([
+    ['click', async (button: HTMLElement) => userEvent.setup().click(button)],
+    ['Enter', async (button: HTMLElement) => { button.focus(); await userEvent.setup().keyboard('{Enter}') }],
+  ])('focus moves to the opposite pager button at a limit (%s)', async (_trigger, activate) => {
+    await loaded('/users/octocat', { octocat: repositoriesOf('r', 45) })
+    const button = (name: string) => within(section()).getByRole('button', { name })
+
+    await activate(button('Próxima'))
+    expect(within(section()).getByText('Página 2 de 2')).toBeVisible()
+    expect(button('Próxima')).toBeDisabled()
+    expect(button('Anterior')).toHaveFocus()
+
+    await activate(button('Anterior'))
+    expect(within(section()).getByText('Página 1 de 2')).toBeVisible()
+    expect(button('Anterior')).toBeDisabled()
+    expect(button('Próxima')).toHaveFocus()
+  })
+
+  it('pager keeps the focus on the clicked button away from the limits', async () => {
+    await loaded('/users/octocat', { octocat: repositoriesOf('r', 70) })
+    const next = within(section()).getByRole('button', { name: 'Próxima' })
+
+    await userEvent.setup().click(next)
+
+    expect(within(section()).getByText('Página 2 de 3')).toBeVisible()
+    expect(next).toHaveFocus()
+  })
+
+  it.each([
     ['click', async (link: HTMLElement) => userEvent.setup().click(link)],
     ['Enter', async (link: HTMLElement) => { link.focus(); await userEvent.setup().keyboard('{Enter}') }],
   ])('opens the detail by %s, with the name encoded, and requests nothing', async (_trigger, activate) => {
