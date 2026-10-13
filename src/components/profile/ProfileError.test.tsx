@@ -59,6 +59,7 @@ describe('ProfileError', () => {
     const { alert, onRetry } = renderError({ kind: 'unexpected', status: 503 })
 
     expect(within(alert).getByRole('heading', { name: 'Algo deu errado' })).toBeVisible()
+    expect(alert).toHaveTextContent('Não foi possível carregar este perfil agora.')
     expect(alert.textContent).not.toContain('503')
     await userEvent.setup().click(within(alert).getByRole('button', { name: 'Tentar novamente' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
