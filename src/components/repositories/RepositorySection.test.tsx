@@ -91,6 +91,12 @@ describe('RepositorySection', () => {
     }
   })
 
+  it.each(errors)('error titles are level-3 headings: %s', (_kind, error, title) => {
+    const { section } = renderSection({ status: 'error', error })
+
+    expect(within(within(section).getByRole('alert')).getByRole('heading', { level: 3, name: title })).toBeVisible()
+  })
+
   it('error rate-limited shows the release time', () => {
     const { section } = renderSection({
       status: 'error',
