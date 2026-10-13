@@ -1,14 +1,14 @@
 import { expect, test as base } from '@playwright/test'
 
-const localHosts = new Set(['localhost', '127.0.0.1'])
+export const localHosts = new Set(['localhost', '127.0.0.1'])
 
 /**
  * Every spec imports `test` from here. The context route is the fallback: page routes
  * registered by the stubs take precedence, so only a request no stub answered reaches it.
  * Such a request is aborted, so nothing leaves the machine, and fails the test.
  */
-export const test = base.extend<{ networkGuard: void }>({
-  networkGuard: [
+export const test = base.extend<{ unroutedRequests: string[] }>({
+  unroutedRequests: [
     async ({ context }, use) => {
       const unrouted: string[] = []
       await context.route('**/*', (route) => {
@@ -17,7 +17,7 @@ export const test = base.extend<{ networkGuard: void }>({
         unrouted.push(url)
         return route.abort('blockedbyclient')
       })
-      await use()
+      await use(unrouted)
       expect(unrouted, 'requests that no page.route intercepted').toEqual([])
     },
     { auto: true },
