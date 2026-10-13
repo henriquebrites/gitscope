@@ -47,7 +47,7 @@ export function json(route: Route, body: unknown, status = 200, headers: Record<
 
 /**
  * Simulates the GitHub API and avatar host. By default every user exists and mirrors
- * octocat under its own login; `onUser` replaces that answer.
+ * octocat under its own login, and every repository exists; `onUser` replaces the user answer.
  */
 export async function stubGitHub(page: Page, onUser?: UserHandler) {
   const users: string[] = []
@@ -60,5 +60,50 @@ export async function stubGitHub(page: Page, onUser?: UserHandler) {
     if (onUser) return onUser(route, login)
     return json(route, { ...octocat, login, html_url: `https://github.com/${login}` })
   })
+  await stubRepository(page)
   return users
+}
+
+export interface RepositoryFixture {
+  id: number
+  name: string
+  full_name: string
+  html_url: string
+  description: string | null
+  stargazers_count: number
+  language: string | null
+  updated_at: string
+}
+
+export function repositoryOf(owner: string, name: string): RepositoryFixture {
+  return {
+    id: 1296269,
+    name,
+    full_name: `${owner}/${name}`,
+    html_url: `https://github.com/${owner}/${name}`,
+    description: 'My first repository on GitHub!',
+    stargazers_count: 12345,
+    language: 'TypeScript',
+    updated_at: '2026-10-01T12:00:00Z',
+  }
+}
+
+export type RepositoryHandler = (route: Route, owner: string, name: string) => Promise<void> | void
+
+/**
+ * Simulates `GET /repos/{owner}/{repo}`; registered after `stubGitHub`, it takes precedence.
+ * By default every repository exists. Returns the `owner/name` of every request.
+ */
+export async function stubRepository(page: Page, onRepository?: RepositoryHandler) {
+  const requested: string[] = []
+  await page.route('https://api.github.com/repos/*/*', (route) => {
+    const [owner, name] = new URL(route.request().url()).pathname
+      .split('/')
+      .slice(2)
+      .map(decodeURIComponent)
+    requested.push(`${owner}/${name}`)
+    if (onRepository) return onRepository(route, owner, name)
+    return json(route, repositoryOf(owner, name))
+  })
+  return requested
 }
