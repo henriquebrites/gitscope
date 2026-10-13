@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { Repository } from '../../types/github'
 import { formatCount, formatDate } from '../../utils/formatters'
 
@@ -9,6 +9,8 @@ interface RepositoryItemProps {
 
 function RepositoryItem({ repository, login }: RepositoryItemProps) {
   const { name, description, stargazers_count, language, updated_at } = repository
+  // The detail's way back returns to this sort and page (read by `listSearchFrom`).
+  const { search } = useLocation()
 
   return (
     // The link's overlay makes the whole card the click target.
@@ -16,6 +18,7 @@ function RepositoryItem({ repository, login }: RepositoryItemProps) {
       <h3 className="text-heading-md break-words text-ink">
         <Link
           to={`/users/${encodeURIComponent(login)}/repos/${encodeURIComponent(name)}`}
+          state={{ listSearch: search }}
           className="rounded-sm text-link after:absolute after:inset-0"
         >
           {name}

@@ -124,3 +124,11 @@ export async function getRepositories(
     if (!hasNextPage(headers)) return repositories
   }
 }
+
+export async function getRepository(owner: string, repo: string, signal?: AbortSignal): Promise<Repository> {
+  const { body } = await request<Repository>(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    signal,
+  )
+  return toRepository(body)
+}

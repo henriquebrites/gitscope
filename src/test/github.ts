@@ -46,6 +46,17 @@ export function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+export const helloWorld: Repository = {
+  id: 1296269,
+  name: 'Hello-World',
+  full_name: 'octocat/Hello-World',
+  html_url: 'https://github.com/octocat/Hello-World',
+  description: 'My first repository on GitHub!',
+  stargazers_count: 12345,
+  language: 'TypeScript',
+  updated_at: '2026-10-01T12:00:00Z',
+}
+
 let nextRepositoryId = 1
 
 export function repositoryOf(name: string, overrides: Partial<Repository> = {}): Repository {
@@ -87,12 +98,22 @@ export function pageOf(url: string): number {
 }
 
 /**
- * A `fetch` stub for routes: profiles mirror octocat under the requested login, and each
- * login's repositories come from `repositories` (default: none), split in pages of 100.
+ * A `fetch` stub for routes: profiles mirror octocat under the requested login, each login's
+ * repositories come from `repositories` (default: none), split in pages of 100, and every
+ * single repository exists, mirroring Hello-World under the requested owner and name.
  */
 export function githubFetch(repositories: Record<string, Repository[]> = {}) {
   return async (url: string): Promise<Response> => {
-    const login = decodeURIComponent(new URL(url).pathname.split('/')[2] ?? '')
+    const [, root, owner = '', name = ''] = new URL(url).pathname.split('/').map(decodeURIComponent)
+    if (root === 'repos') {
+      return jsonResponse({
+        ...helloWorld,
+        name,
+        full_name: `${owner}/${name}`,
+        html_url: `https://github.com/${owner}/${name}`,
+      })
+    }
+    const login = owner
     if (!isRepositoriesUrl(url)) {
       return jsonResponse({ ...octocat, login, html_url: `https://github.com/${login}` })
     }

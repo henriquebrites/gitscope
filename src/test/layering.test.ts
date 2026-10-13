@@ -28,6 +28,10 @@ describe('layering', () => {
         '../components/repositories/RepositorySection.tsx',
         '../components/repositories/RepositorySort.tsx',
         '../pages/UserPage.tsx',
+        '../pages/RepositoryPage.tsx',
+        '../components/repositories/RepositoryDetail.tsx',
+        '../components/repositories/RepositoryDetailError.tsx',
+        '../components/repositories/RepositoryDetailSection.tsx',
       ]),
     )
   })

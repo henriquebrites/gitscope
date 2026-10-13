@@ -92,8 +92,9 @@ const repositoriesPath = /^\/users\/[^/]+\/repos$/
 
 /**
  * Simulates the GitHub API and avatar host. By default every user exists and mirrors
- * octocat under its own login, with no repositories; `onUser` and `onRepositories` replace
- * those answers. Returns the logins whose profile was requested.
+ * octocat under its own login, with no repositories, and every single repository exists;
+ * `onUser` and `onRepositories` replace the first two answers. Returns the logins whose
+ * profile was requested.
  */
 export async function stubGitHub(page: Page, onUser?: UserHandler, onRepositories?: RepositoriesHandler) {
   const users: string[] = []
@@ -116,5 +117,29 @@ export async function stubGitHub(page: Page, onUser?: UserHandler, onRepositorie
       return json(route, [])
     },
   )
+  await stubRepository(page)
   return users
+}
+
+export type RepositoryHandler = (route: Route, owner: string, name: string) => Promise<void> | void
+
+/**
+ * Simulates `GET /repos/{owner}/{repo}`; registered after `stubGitHub`, it takes precedence.
+ * By default every repository exists. Returns the `owner/name` of every request.
+ */
+export async function stubRepository(page: Page, onRepository?: RepositoryHandler) {
+  const requested: string[] = []
+  await page.route('https://api.github.com/repos/*/*', (route) => {
+    const [owner, name] = new URL(route.request().url()).pathname
+      .split('/')
+      .slice(2)
+      .map(decodeURIComponent)
+    requested.push(`${owner}/${name}`)
+    if (onRepository) return onRepository(route, owner, name)
+    return json(
+      route,
+      repositoryOf(name, { full_name: `${owner}/${name}`, html_url: `https://github.com/${owner}/${name}` }),
+    )
+  })
+  return requested
 }
