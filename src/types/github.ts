@@ -22,3 +22,6 @@ export interface Repository {
   language: string | null
   updated_at: string
 }
+
+/** Values of `?sort=` on the profile page; `stars-desc` is the default. */
+export type SortKey = 'stars-desc' | 'stars-asc' | 'name-asc' | 'updated-desc'

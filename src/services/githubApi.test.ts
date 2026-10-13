@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { abortError, helloWorld, jsonResponse, octocat } from '../test/github'
-import type { Profile } from '../types/github'
-import { getRepository, getUser, GitHubApiError, type GitHubError } from './githubApi'
+import {
+  abortError,
+  deferred,
+  helloWorld,
+  jsonResponse,
+  octocat,
+  repositoriesOf,
+  repositoriesPage,
+  repositoryOf,
+} from '../test/github'
+import type { Profile, Repository } from '../types/github'
+import { getRepositories, getRepository, getUser, GitHubApiError, type GitHubError } from './githubApi'
 
 let fetchSpy: ReturnType<typeof vi.fn>
 
@@ -216,6 +225,138 @@ describe('getUser', () => {
     fetchSpy.mockResolvedValue(jsonResponse({ message: 'error' }, status, headers))
 
     expect(await failureOf(getUser('octocat'))).toEqual({ kind: 'unexpected', status })
+  })
+})
+
+const reposUrl = (page: number) => `https://api.github.com/users/octocat/repos?per_page=100&page=${page}`
+const requestedUrls = () => fetchSpy.mock.calls.map(([url]) => url as string)
+
+describe('getRepositories', () => {
+  it('fetches every page while rel="next" is present', async () => {
+    const pages = [repositoriesOf('a', 100), repositoriesOf('b', 100), repositoriesOf('c', 37)]
+    fetchSpy.mockImplementation(async (url: string) => {
+      const page = Number(new URL(url).searchParams.get('page'))
+      return repositoriesPage(pages[page - 1], page, 3)
+    })
+
+    const repositories = await getRepositories('octocat')
+
+    expect(requestedUrls()).toEqual([reposUrl(1), reposUrl(2), reposUrl(3)])
+    expect(repositories).toHaveLength(237)
+    expect(repositories).toEqual(pages.flat())
+    const headers = new Headers((fetchSpy.mock.calls[0][1] as RequestInit).headers)
+    expect(headers.has('Authorization')).toBe(false)
+  })
+
+  it('requests one page at a time, each after the previous arrived', async () => {
+    const first = deferred<Response>()
+    const second = deferred<Response>()
+    fetchSpy.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const pagesSeen: number[] = []
+
+    const result = getRepositories('octocat', { onPage: (page) => pagesSeen.push(page) })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(pagesSeen).toEqual([1])
+
+    first.resolve(repositoriesPage(repositoriesOf('a', 100), 1, 2))
+    await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2))
+    expect(pagesSeen).toEqual([1, 2])
+    second.resolve(repositoriesPage(repositoriesOf('b', 3), 2, 2))
+
+    expect(await result).toHaveLength(103)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['no link header', {}],
+    ['only prev and first', { link: '<https://api.github.com/user/1/repos?page=1>; rel="prev", <https://api.github.com/user/1/repos?page=1>; rel="first"' }],
+    ['only last', { link: '<https://api.github.com/user/1/repos?page=1>; rel="last"' }],
+  ])('stops without rel=next (%s)', async (_case, headers: Record<string, string>) => {
+    fetchSpy.mockResolvedValue(jsonResponse(repositoriesOf('a', 5), 200, headers))
+
+    expect(await getRepositories('octocat')).toHaveLength(5)
+    expect(requestedUrls()).toEqual([reposUrl(1)])
+  })
+
+  it('encodes the login in the path', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse([]))
+
+    expect(await getRepositories('a b/c')).toEqual([])
+    expect(requestedUrls()).toEqual(['https://api.github.com/users/a%20b%2Fc/repos?per_page=100&page=1'])
+  })
+
+  it('normalizes repositories to the PRD fields, missing description and language as null', async () => {
+    const full = repositoryOf('full', { stargazers_count: 42 })
+    const bare: Partial<Repository> = repositoryOf('bare')
+    delete bare.description
+    delete bare.language
+    fetchSpy.mockResolvedValue(
+      jsonResponse([{ ...full, owner: { login: 'octocat' }, forks: 3 }, bare]),
+    )
+
+    const repositories = await getRepositories('octocat')
+
+    expect(repositories).toEqual([full, { ...bare, description: null, language: null }])
+    expect(repositories[1]).not.toHaveProperty('owner')
+    expect(repositories[0]).not.toHaveProperty('forks')
+    expectTypeOf<Repository>().toEqualTypeOf<{
+      id: number
+      name: string
+      full_name: string
+      html_url: string
+      description: string | null
+      stargazers_count: number
+      language: string | null
+      updated_at: string
+    }>()
+  })
+
+  it('maps a body that is not a list to unexpected', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ message: 'odd' }))
+
+    expect(await failureOf(getRepositories('octocat'))).toEqual({ kind: 'unexpected', status: 200 })
+  })
+
+  it.each<[string, () => Promise<Response>, GitHubError]>([
+    ['500', async () => jsonResponse({ message: 'Server Error' }, 500), { kind: 'unexpected', status: 500 }],
+    ['network', async () => Promise.reject(new TypeError('Failed to fetch')), { kind: 'network' }],
+    [
+      'rate limit',
+      async () =>
+        jsonResponse({ message: 'API rate limit exceeded' }, 403, {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '1791900300',
+        }),
+      { kind: 'rate-limited', resetAt: new Date(1791900300 * 1000) },
+    ],
+  ])('a failing page rejects the whole list (page 2: %s)', async (_case, secondPage, expected) => {
+    fetchSpy
+      .mockResolvedValueOnce(repositoriesPage(repositoriesOf('a', 100), 1, 3))
+      .mockImplementationOnce(secondPage)
+
+    expect(await failureOf(getRepositories('octocat'))).toEqual(expected)
+    expect(requestedUrls()).toEqual([reposUrl(1), reposUrl(2)])
+  })
+
+  it('abort between pages: rejects with the AbortError and requests no next page', async () => {
+    const controller = new AbortController()
+    const first = deferred<Response>()
+    fetchSpy.mockReturnValueOnce(first.promise)
+
+    const result = getRepositories('octocat', { signal: controller.signal }).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    controller.abort()
+    // The stub ignores the abort, as a response already in flight would.
+    first.resolve(repositoriesPage(repositoriesOf('a', 100), 1, 3))
+    const reason = await result
+
+    expect(reason).toBe(controller.signal.reason)
+    expect((reason as Error).name).toBe('AbortError')
+    expect(requestedUrls()).toEqual([reposUrl(1)])
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal)
   })
 })
 

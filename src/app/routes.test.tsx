@@ -1,10 +1,10 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { deferred, helloWorld, jsonResponse, octocat } from '../test/github'
+import { deferred, githubFetch, jsonResponse, octocat } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -55,9 +55,10 @@ function allRoutes(list: RouteObject[]): RouteObject[] {
 let fetchSpy: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  // The profile route requests its user and the detail route its repository; every test answers
-  // with octocat and Hello-World unless it says otherwise.
-  fetchSpy = vi.fn(async (url: string) => jsonResponse(url.includes('/repos/') ? helloWorld : octocat))
+  // The profile route requests its user, then its repositories, and the detail route its
+  // repository; every user mirrors octocat and has none, and every repository mirrors
+  // Hello-World, unless a test says otherwise.
+  fetchSpy = vi.fn(githubFetch())
   vi.stubGlobal('fetch', fetchSpy)
 })
 
@@ -85,7 +86,7 @@ describe('routes', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /octocat/ })).toBeVisible()
 
     const detail = within(renderAt('/users/octocat/repos/hello-world').container)
-    expect(await detail.findByRole('heading', { level: 1, name: 'Hello-World' })).toBeVisible()
+    expect(await detail.findByRole('heading', { level: 1, name: 'hello-world' })).toBeVisible()
     // The detail belongs to the user in the URL: its way back goes to that user's list.
     expect(detail.getByRole('link', { name: 'Voltar aos repositórios' })).toHaveAttribute('href', '/users/octocat')
   })
@@ -124,18 +125,36 @@ describe('routes', () => {
   it('navigates to the profile without query', async () => {
     const user = userEvent.setup()
     const { router } = renderAt('/users/x?sort=name-asc&page=2')
+    // Each profile settles (profile, then its empty repositories) before the next search.
+    await screen.findByText('Esta conta não tem repositórios públicos.')
 
     await user.type(searchField(), '  octocat  {Enter}')
     expect(router.state.location.pathname).toBe('/users/octocat')
     expect(router.state.location.search).toBe('')
+    await screen.findByText('Esta conta não tem repositórios públicos.')
 
     await user.type(searchField(), 'a b/c{Enter}')
     expect(router.state.location.pathname).toBe('/users/a%20b%2Fc')
     expect(router.state.location.search).toBe('')
-    // The search only navigates; the request that follows is the profile route's, for that login.
-    expect(fetchSpy).toHaveBeenLastCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
-    // One request per profile visited (x, octocat, a b/c); the search adds none of its own.
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    // The search only navigates; the requests that follow are the profile route's, for that login.
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenLastCalledWith(
+        'https://api.github.com/users/a%20b%2Fc/repos?per_page=100&page=1',
+        expect.anything(),
+      ),
+    )
+    expect(fetchSpy).toHaveBeenCalledWith('https://api.github.com/users/a%20b%2Fc', expect.anything())
+    // Per profile visited (x, octocat, a b/c): its profile, then its repositories. The search
+    // adds no request of its own.
+    expect(fetchSpy.mock.calls.map(([url]) => url as string)).toEqual([
+      'https://api.github.com/users/x',
+      'https://api.github.com/users/x/repos?per_page=100&page=1',
+      'https://api.github.com/users/octocat',
+      'https://api.github.com/users/octocat/repos?per_page=100&page=1',
+      'https://api.github.com/users/a%20b%2Fc',
+      'https://api.github.com/users/a%20b%2Fc/repos?per_page=100&page=1',
+    ])
+    expect(fetchSpy).toHaveBeenCalledTimes(6)
   })
 
   it('field starts empty after navigation', async () => {

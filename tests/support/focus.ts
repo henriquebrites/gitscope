@@ -14,9 +14,9 @@ export interface Focused {
 }
 
 /** Presses Tab until focus leaves the page, recording every element that received focus. */
-export async function tabThrough(page: Page): Promise<Focused[]> {
+export async function tabThrough(page: Page, maxSteps = 30): Promise<Focused[]> {
   const visited: Focused[] = []
-  for (let step = 0; step < 30; step += 1) {
+  for (let step = 0; step < maxSteps; step += 1) {
     await page.keyboard.press('Tab')
     const focused = await page.evaluate((): Focused | null => {
       const element = document.activeElement

@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { expectFocusRing, expectVisualTabOrder, tabThrough } from './support/focus.js'
-import { json, repositoryOf, stubGitHub, stubRepository, type RepositoryHandler } from './support/github.js'
+import {
+  json,
+  repositoryOf,
+  stubGitHub,
+  stubRepository,
+  type RepositoryHandler,
+} from './support/github.js'
 
 const mobile = { width: 320, height: 480 }
 const desktop = { width: 1280, height: 800 }
@@ -18,7 +24,7 @@ interface DetailState {
 const states: DetailState[] = [
   {
     name: 'long name and description',
-    handler: (route, owner) => json(route, { ...repositoryOf(owner, longName), description: longText }),
+    handler: (route) => json(route, repositoryOf(longName, { description: longText })),
     heading: longName,
   },
   {
