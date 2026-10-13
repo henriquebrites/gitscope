@@ -1,4 +1,4 @@
-import type { Profile } from '../types/github'
+import type { Profile, Repository } from '../types/github'
 
 export const octocat: Profile = {
   login: 'octocat',
@@ -44,4 +44,15 @@ export function deferred<T>() {
     reject = rej
   })
   return { promise, resolve, reject }
+}
+
+export const helloWorld: Repository = {
+  id: 1296269,
+  name: 'Hello-World',
+  full_name: 'octocat/Hello-World',
+  html_url: 'https://github.com/octocat/Hello-World',
+  description: 'My first repository on GitHub!',
+  stargazers_count: 12345,
+  language: 'TypeScript',
+  updated_at: '2026-10-01T12:00:00Z',
 }

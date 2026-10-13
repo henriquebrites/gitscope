@@ -1,4 +1,4 @@
-import type { Profile } from '../types/github'
+import type { Profile, Repository } from '../types/github'
 
 const API_URL = 'https://api.github.com'
 
@@ -77,4 +77,25 @@ export async function getUser(login: string, signal?: AbortSignal): Promise<Prof
     following: user.following,
     public_repos: user.public_repos,
   }
+}
+
+function toRepository(repository: Repository): Repository {
+  return {
+    id: repository.id,
+    name: repository.name,
+    full_name: repository.full_name,
+    html_url: repository.html_url,
+    description: repository.description ?? null,
+    stargazers_count: repository.stargazers_count,
+    language: repository.language ?? null,
+    updated_at: repository.updated_at,
+  }
+}
+
+export async function getRepository(owner: string, repo: string, signal?: AbortSignal): Promise<Repository> {
+  const repository = await request<Repository>(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    signal,
+  )
+  return toRepository(repository)
 }

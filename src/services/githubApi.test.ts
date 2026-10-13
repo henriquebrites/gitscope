@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { abortError, jsonResponse, octocat } from '../test/github'
+import { abortError, helloWorld, jsonResponse, octocat } from '../test/github'
 import type { Profile } from '../types/github'
-import { getUser, GitHubApiError, type GitHubError } from './githubApi'
+import { getRepository, getUser, GitHubApiError, type GitHubError } from './githubApi'
 
 let fetchSpy: ReturnType<typeof vi.fn>
 
@@ -216,5 +216,74 @@ describe('getUser', () => {
     fetchSpy.mockResolvedValue(jsonResponse({ message: 'error' }, status, headers))
 
     expect(await failureOf(getUser('octocat'))).toEqual({ kind: 'unexpected', status })
+  })
+})
+
+describe('getRepository', () => {
+  it('getRepository requests one repository anonymously and returns the PRD fields', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ ...helloWorld, forks_count: 9, owner: { login: 'octocat' } }))
+
+    const repository = await getRepository('octocat', 'Hello-World')
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit | undefined]
+    expect(url).toBe('https://api.github.com/repos/octocat/Hello-World')
+    expect(init?.method ?? 'GET').toBe('GET')
+    expect(new Headers(init?.headers).has('Authorization')).toBe(false)
+    expect(repository).toEqual({
+      id: 1296269,
+      name: 'Hello-World',
+      full_name: 'octocat/Hello-World',
+      html_url: 'https://github.com/octocat/Hello-World',
+      description: 'My first repository on GitHub!',
+      stargazers_count: 12345,
+      language: 'TypeScript',
+      updated_at: '2026-10-01T12:00:00Z',
+    })
+  })
+
+  it('getRepository encodes the owner and the repository name', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse(helloWorld))
+
+    await getRepository('a b', 'x/y')
+
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://api.github.com/repos/a%20b/x%2Fy')
+  })
+
+  it.each([
+    ['null', { description: null, language: null }],
+    ['missing', { description: undefined, language: undefined }],
+  ])('getRepository normalizes %s description and language to null', async (_case, fields) => {
+    fetchSpy.mockResolvedValue(jsonResponse({ ...helloWorld, ...fields }))
+
+    const repository = await getRepository('octocat', 'Hello-World')
+
+    expect(repository.description).toBeNull()
+    expect(repository.language).toBeNull()
+  })
+
+  it('getRepository maps each failure to its domain error', async () => {
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: 'Not Found' }, 404))
+    expect(await failureOf(getRepository('octocat', 'nope'))).toEqual({ kind: 'not-found' })
+
+    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    expect(await failureOf(getRepository('octocat', 'Hello-World'))).toEqual({ kind: 'network' })
+
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ message: 'API rate limit exceeded' }, 403, {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': '1791900300',
+      }),
+    )
+    expect(await failureOf(getRepository('octocat', 'Hello-World'))).toEqual({
+      kind: 'rate-limited',
+      resetAt: new Date(1791900300 * 1000),
+    })
+
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: 'Server Error' }, 500))
+    expect(await failureOf(getRepository('octocat', 'Hello-World'))).toEqual({
+      kind: 'unexpected',
+      status: 500,
+    })
   })
 })
