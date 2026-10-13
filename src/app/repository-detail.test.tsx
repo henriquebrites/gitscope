@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { abortError, deferred, helloWorld, jsonResponse, octocat } from '../test/github'
+import { abortError, deferred, githubFetch, helloWorld, jsonResponse, octocat, repositoriesOf } from '../test/github'
 import { routes } from './routes'
 
 let fetchSpy: ReturnType<typeof vi.fn>
@@ -172,5 +172,28 @@ describe('repository detail route', () => {
 
       expect(backLink()).toHaveAttribute('href', '/users/octocat')
     })
+  })
+
+  it('from the list: opens without a request and goes back to the same sort and page', async () => {
+    fetchSpy.mockImplementation(githubFetch({ octocat: repositoriesOf('r', 45) }))
+    const router = renderAt('/users/octocat?sort=name-asc&page=2')
+    const list = await within(main()).findByRole('region', { name: 'Repositórios' })
+    await within(list).findByText('Página 2 de 2')
+    const requestsBefore = fetchSpy.mock.calls.length
+    const user = userEvent.setup()
+
+    await user.click(within(list).getByRole('link', { name: 'r-031' }))
+
+    expect(router.state.location.pathname).toBe('/users/octocat/repos/r-031')
+    expect(within(main()).getByRole('heading', { level: 1, name: 'r-031' })).toBeVisible()
+    expect(backLink()).toHaveAttribute('href', '/users/octocat?sort=name-asc&page=2')
+
+    await user.click(backLink())
+
+    expect(router.state.location.pathname).toBe('/users/octocat')
+    expect(router.state.location.search).toBe('?sort=name-asc&page=2')
+    const back = within(main()).getByRole('region', { name: 'Repositórios' })
+    expect(within(back).getByText('Página 2 de 2')).toBeVisible()
+    expect(fetchSpy.mock.calls.length).toBe(requestsBefore)
   })
 })

@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import { expectFocusRing, expectVisualTabOrder, tabThrough } from './support/focus.js'
 import {
   json,
+  pagedRepositories,
+  repositoriesOf,
   repositoryOf,
   stubGitHub,
   stubRepository,
@@ -112,4 +114,25 @@ test('refresh refetches the repository: the cache lives only in memory', async (
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: 'Hello-World' })).toBeVisible()
   expect(repositories).toEqual(['octocat/Hello-World', 'octocat/Hello-World'])
+})
+
+test('from the list: no repository request, and back to the same sort and page', async ({ page }) => {
+  const users = await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 45)))
+  const repositories = await stubRepository(page)
+
+  await page.goto('/users/octocat?sort=name-asc&page=2')
+  const list = page.getByRole('region', { name: 'Repositórios' })
+  await expect(list.getByText('Página 2 de 2')).toBeVisible()
+  await list.getByRole('link', { name: 'r-031' }).click()
+
+  await expect(page).toHaveURL('/users/octocat/repos/r-031')
+  await expect(page.getByRole('heading', { level: 1, name: 'r-031' })).toBeVisible()
+  expect(repositories).toEqual([])
+
+  await page.getByRole('link', { name: 'Voltar aos repositórios' }).click()
+
+  await expect(page).toHaveURL('/users/octocat?sort=name-asc&page=2')
+  await expect(list.getByText('Página 2 de 2')).toBeVisible()
+  expect(repositories).toEqual([])
+  expect(users).toEqual(['octocat'])
 })
