@@ -120,7 +120,8 @@ mobile, siga estas etapas:
     ```
 
 2.  Em outro terminal, crie a pasta dos relatórios e rode o Lighthouse pelo
-    `npx` (ele usa o Google Chrome instalado):
+    `npx`. O Lighthouse 13.5.0 exige Node.js 22.19 ou mais recente e usa o
+    Google Chrome instalado:
 
     ```bash
     mkdir -p lighthouse
