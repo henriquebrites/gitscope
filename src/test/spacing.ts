@@ -1,20 +1,22 @@
 import { compile } from 'tailwindcss'
 import tailwindCss from 'tailwindcss/index.css?raw'
-import { themeBlock } from './theme'
+import projectCss from '../index.css?raw'
 
 // DESIGN.md spacing steps on the 4px base: xxs 1, xs 2, sm 3, md 4, lg 6, xl 8, 2xl 10,
 // 3xl 16, 4xl 24, section 32. Zero resets spacing and is allowed too.
 export const allowedSpacingFactors = new Set([0, 1, 2, 3, 4, 6, 8, 10, 16, 24, 32])
 
-// An arbitrary value or `px` after `-`, or an arbitrary modifier after `/` (text-x/[13px]).
-const offScaleValue = /(-)(\[.*\]|\(.*\)|px)$|(\/)(\[.*\]|\(.*\))$/
+// The last value segment: an arbitrary value or `px` after `-`, or an arbitrary modifier
+// after `/`, optionally followed by the important flag (`p-[13px]!`).
+const offScaleValue = /(-|\/)(\[[^\]]*\]|\([^)]*\)|px)(!?)$/
 
-// Theme only: the base layer is left out so each build holds just the candidate's rules;
-// classes the base layer applies are checked as candidates (see appliedClasses).
-const themeOnlyCss = `@import 'tailwindcss';\n@theme {${themeBlock}\n}`
+// The project stylesheet without its base layer, so each build holds only the candidate's
+// rules (custom @utility definitions included); classes the base layer applies are checked
+// as candidates (see appliedClasses).
+const candidateCss = projectCss.replace(/@layer base\s*{[\s\S]*?\n}/, '')
 
 async function build(candidates: string[]): Promise<string> {
-  const compiler = await compile(themeOnlyCss, {
+  const compiler = await compile(candidateCss, {
     loadStylesheet: async (id, base) => {
       if (id !== 'tailwindcss') throw new Error(`Unexpected stylesheet: ${id}`)
       return { path: id, base, content: tailwindCss }
@@ -51,7 +53,7 @@ export async function spacingReport(
       if (factors.some((factor) => !allowedSpacingFactors.has(factor))) offScale.push(name)
     } else if (offScaleValue.test(name)) {
       const probe = spacingFactors(
-        await build([name.replace(offScaleValue, (_, dash, _v, slash) => `${dash ?? slash}2`)]),
+        await build([name.replace(offScaleValue, (_, separator, _value, important) => `${separator}2${important}`)]),
       )
       if (probe.length > 0) {
         spacing.push(name)

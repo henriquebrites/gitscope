@@ -3,7 +3,7 @@ import css from '../index.css?raw'
 export type TokenGroup = 'color' | 'font' | 'text' | 'spacing' | 'radius'
 
 /** Body of the `@theme` block in src/index.css. */
-export const themeBlock = css.match(/@theme\s*{([\s\S]*?)\n}/)?.[1] ?? ''
+const themeBlock = css.match(/@theme\s*{([\s\S]*?)\n}/)?.[1] ?? ''
 
 /** Utility classes applied with `@apply` in src/index.css (the base layer). */
 export const appliedClasses: string[] = [...css.matchAll(/@apply\s+([^;]+);/g)].flatMap(
