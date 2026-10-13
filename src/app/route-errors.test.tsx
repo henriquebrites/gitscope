@@ -2,6 +2,9 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { usedClasses, usesToken, withoutVariants } from '../test/classes'
+import { spacingReport } from '../test/spacing'
+import { tokensOf } from '../test/theme'
 import { routes } from './routes'
 
 const crash = vi.hoisted(() => ({ page: false, header: false }))
@@ -28,9 +31,14 @@ vi.mock('../components/layout/AppHeader', async (importOriginal) => {
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
-  render(<RouterProvider router={router} />)
-  return router
+  const { container } = render(<RouterProvider router={router} />)
+  return Object.assign(router, { container })
 }
+
+const errorScreens = [
+  ['route error', 'page', '/users/octocat/repos/hello-world'],
+  ['root error', 'header', '/'],
+] as const
 
 beforeEach(() => {
   // React and the router report caught render errors on the console.
@@ -72,5 +80,38 @@ describe('route errors', () => {
     const alert = await screen.findByRole('alert')
     expect(within(alert).getByRole('heading', { name: 'Algo deu errado' })).toBeVisible()
     expect(within(alert).getByRole('link', { name: 'Voltar ao início' })).toHaveAttribute('href', '/')
+  })
+
+  it.each(errorScreens)('spacing on the %s screen', async (_name, part, path) => {
+    crash[part] = true
+    const { container } = renderAt(path)
+    await screen.findByRole('alert')
+
+    const rawClasses = usedClasses(container)
+    const classes = withoutVariants(rawClasses)
+    expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
+    expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
+    const { spacing, offScale } = await spacingReport(rawClasses)
+    expect(spacing.length, 'spacing').toBeGreaterThan(0)
+    expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])
+  })
+
+  // The ring comes from the global :focus-visible rule in src/index.css (proven in the browser
+  // by tests/app-shell.spec.ts); these screens cannot be crashed in the preview build, so this
+  // proves no focusable on them opts out of that rule.
+  it.each(errorScreens)('focus ring rule reaches every focusable on the %s screen', async (_name, part, path) => {
+    crash[part] = true
+    const { container } = renderAt(path)
+    await screen.findByRole('alert')
+
+    const focusables = [...container.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
+    expect(focusables.length).toBeGreaterThan(0)
+    for (const element of focusables) {
+      const overrides = [...element.classList].filter((name) =>
+        /(^|:)(outline|ring)(-|$)|(^|:)focus(-visible|-within)?:/.test(name),
+      )
+      expect(overrides, element.outerHTML).toEqual([])
+      expect(element.tabIndex, element.outerHTML).toBeGreaterThanOrEqual(0)
+    }
   })
 })

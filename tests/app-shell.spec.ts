@@ -66,22 +66,17 @@ for (const path of screens) {
       expect(header!.y + header!.height).toBeLessThanOrEqual(main!.y)
     })
 
-    test('caps the content width at 1280', async ({ page }) => {
-      await page.setViewportSize(desktop)
-      await page.goto(path)
+    for (const viewport of [{ width: 1024, height: 768 }, desktop]) {
+      test(`caps the content width at ${viewport.width}`, async ({ page }) => {
+        await page.setViewportSize(viewport)
+        await page.goto(path)
 
-      const width = await page.evaluate(() => {
-        const main = document.querySelector('main')!
-        const style = getComputedStyle(main)
-        return (
-          main.getBoundingClientRect().width -
-          Number.parseFloat(style.paddingLeft) -
-          Number.parseFloat(style.paddingRight)
-        )
+        const box = await page.getByRole('main').boundingBox()
+        expect(box).toBeTruthy()
+        expect(box!.width).toBeGreaterThan(0)
+        expect(box!.width).toBeLessThanOrEqual(768)
       })
-      expect(width).toBeGreaterThan(0)
-      expect(width).toBeLessThanOrEqual(768)
-    })
+    }
 
     for (const viewport of [mobile, desktop]) {
       test(`focus ring on every focusable at ${viewport.width}`, async ({ page }) => {
