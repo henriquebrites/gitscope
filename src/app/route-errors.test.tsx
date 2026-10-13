@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { jsonResponse, octocat } from '../test/github'
+import { githubFetch } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -44,8 +44,8 @@ const errorScreens = [
 let fetchSpy: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  // The header search lands on the profile route, which requests its user.
-  fetchSpy = vi.fn(async () => jsonResponse(octocat))
+  // The header search lands on the profile route, which requests its user and repositories.
+  fetchSpy = vi.fn(githubFetch())
   vi.stubGlobal('fetch', fetchSpy)
   // React and the router report caught render errors on the console.
   vi.spyOn(console, 'error').mockImplementation(() => {})

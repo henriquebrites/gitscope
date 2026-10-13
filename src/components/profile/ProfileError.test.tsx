@@ -59,8 +59,20 @@ describe('ProfileError', () => {
     const { alert, onRetry } = renderError({ kind: 'unexpected', status: 503 })
 
     expect(within(alert).getByRole('heading', { name: 'Algo deu errado' })).toBeVisible()
+    expect(alert).toHaveTextContent('Não foi possível carregar este perfil agora.')
     expect(alert.textContent).not.toContain('503')
     await userEvent.setup().click(within(alert).getByRole('button', { name: 'Tentar novamente' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    [{ kind: 'not-found' }, 'Conta não encontrada'],
+    [{ kind: 'network' }, 'Sem conexão'],
+    [{ kind: 'rate-limited' }, 'Limite de consultas atingido'],
+    [{ kind: 'unexpected' }, 'Algo deu errado'],
+  ] satisfies [GitHubError, string][])('titles are level-1 headings: %o', (error, title) => {
+    const { alert } = renderError(error)
+
+    expect(within(alert).getByRole('heading', { level: 1, name: title })).toBeVisible()
   })
 })

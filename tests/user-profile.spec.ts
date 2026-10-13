@@ -144,5 +144,10 @@ test('requests go only to the GitHub API, without credentials', async ({ page })
   await page.goto('/users/octocat')
   await expect(page.getByRole('heading', { level: 1, name: 'octocat' })).toBeVisible()
 
-  expect(apiRequests).toEqual([{ url: 'https://api.github.com/users/octocat', authorization: undefined }])
+  await expect(page.getByText('Esta conta não tem repositórios públicos.')).toBeVisible()
+  // The profile, then its repositories (T3).
+  expect(apiRequests).toEqual([
+    { url: 'https://api.github.com/users/octocat', authorization: undefined },
+    { url: 'https://api.github.com/users/octocat/repos?per_page=100&page=1', authorization: undefined },
+  ])
 })
