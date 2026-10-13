@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
+import { jsonResponse, octocat } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -40,7 +41,12 @@ const errorScreens = [
   ['root error', 'header', '/'],
 ] as const
 
+let fetchSpy: ReturnType<typeof vi.fn>
+
 beforeEach(() => {
+  // The header search lands on the profile route, which requests its user.
+  fetchSpy = vi.fn(async () => jsonResponse(octocat))
+  vi.stubGlobal('fetch', fetchSpy)
   // React and the router report caught render errors on the console.
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -49,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
   crash.page = false
   crash.header = false
+  vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
@@ -70,6 +77,7 @@ describe('route errors', () => {
 
     expect(router.state.location.pathname).toBe('/users/octocat')
     expect(await screen.findByRole('heading', { level: 1, name: /octocat/ })).toBeVisible()
+    expect(fetchSpy).toHaveBeenCalledWith('https://api.github.com/users/octocat', expect.anything())
     expect(screen.queryByRole('heading', { name: 'Algo deu errado' })).not.toBeInTheDocument()
   })
 

@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { GitHubContext } from '../../context/GitHubContext'
+import { initialGitHubState, type GitHubState } from '../../context/githubReducer'
 import AppHeader from './AppHeader'
 
 // A stub route tree, so only the header's own decisions are under test.
@@ -22,8 +23,12 @@ function renderHeader(path: string, isProfileLoading = false) {
     ],
     { initialEntries: [path] },
   )
+  const state: GitHubState = {
+    ...initialGitHubState,
+    profileRequest: isProfileLoading ? { key: 'octocat', status: 'loading' } : null,
+  }
   render(
-    <GitHubContext value={{ isProfileLoading }}>
+    <GitHubContext value={{ state, dispatch: vi.fn() }}>
       <RouterProvider router={router} />
     </GitHubContext>,
   )

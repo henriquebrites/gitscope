@@ -1,15 +1,12 @@
 import { useParams } from 'react-router-dom'
+import ProfileSection from '../components/profile/ProfileSection'
+import { useProfile } from '../hooks/useProfile'
 
-// Placeholder until T2 fetches the profile.
 function UserPage() {
   const { username = '' } = useParams()
+  const { result, retry } = useProfile(username)
 
-  return (
-    <>
-      <h1 className="text-heading-lg break-words text-ink">{username}</h1>
-      <p className="text-body-lg text-body">O perfil público desta conta aparece aqui.</p>
-    </>
-  )
+  return <ProfileSection result={result} login={username} onRetry={retry} />
 }
 
 export default UserPage

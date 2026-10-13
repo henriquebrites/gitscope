@@ -1,13 +1,16 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, type Dispatch } from 'react'
+import type { GitHubAction, GitHubState } from './githubReducer'
 
-/** State shared between routes. T2 provides the real value; until then nothing is loading. */
-export interface GitHubState {
-  /** True while the profile of the current route is being fetched. */
-  isProfileLoading: boolean
+/** State shared between routes: the session cache and the current profile request. */
+export interface GitHubContextValue {
+  state: GitHubState
+  dispatch: Dispatch<GitHubAction>
 }
 
-export const GitHubContext = createContext<GitHubState>({ isProfileLoading: false })
+export const GitHubContext = createContext<GitHubContextValue | null>(null)
 
-export function useGitHub(): GitHubState {
-  return useContext(GitHubContext)
+export function useGitHub(): GitHubContextValue {
+  const value = useContext(GitHubContext)
+  if (!value) throw new Error('useGitHub must be used inside GitHubProvider')
+  return value
 }
