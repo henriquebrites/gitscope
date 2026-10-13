@@ -122,6 +122,33 @@ describe('getUser', () => {
     expect(reason).not.toBeInstanceOf(GitHubApiError)
   })
 
+  // Either sign of an abort is enough on its own: the aborted signal, or an AbortError.
+  it('abort is recognised by the aborted signal alone', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const failure = new Error('request torn down')
+    fetchSpy.mockRejectedValue(failure)
+
+    const reason = await getUser('octocat', controller.signal).then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    expect(reason).toBe(failure)
+  })
+
+  it('abort is recognised by an AbortError alone', async () => {
+    const aborted = abortError()
+    fetchSpy.mockRejectedValue(aborted)
+
+    const reason = await getUser('octocat', new AbortController().signal).then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    expect(reason).toBe(aborted)
+  })
+
   it('maps an unreadable body to unexpected with its status', async () => {
     fetchSpy.mockResolvedValue(new Response('<html>not json</html>', { status: 200 }))
 

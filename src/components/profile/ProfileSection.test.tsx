@@ -73,9 +73,10 @@ describe('ProfileSection', () => {
 
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
-    // Typography comes only from DESIGN.md tokens: no stock sizes, weights or tracking on top.
+    // Typography comes only from DESIGN.md tokens: no stock sizes, weights or tracking on top,
+    // and no arbitrary values (`text-[15px]`, `font-[500]`).
     const stockTypography = classes.filter((name) =>
-      /^(?:text-(?:xs|sm|base|lg|[2-9]?xl)|font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)|tracking-|leading-)/.test(name),
+      /^(?:text-(?:xs|sm|base|lg|[2-9]?xl|\[)|font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[)|tracking-|leading-)/.test(name),
     )
     expect(stockTypography, 'typography off the DESIGN.md tokens').toEqual([])
     const { spacing, offScale } = await spacingReport(rawClasses)
