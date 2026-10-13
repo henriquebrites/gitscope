@@ -10,3 +10,18 @@ export interface Profile {
   following: number
   public_repos: number
 }
+
+/** Public repository returned by `GET /users/{username}/repos` (PRD §10). */
+export interface Repository {
+  id: number
+  name: string
+  full_name: string
+  html_url: string
+  description: string | null
+  stargazers_count: number
+  language: string | null
+  updated_at: string
+}
+
+/** Values of `?sort=` on the profile page; `stars-desc` is the default. */
+export type SortKey = 'stars-desc' | 'stars-asc' | 'name-asc' | 'updated-desc'

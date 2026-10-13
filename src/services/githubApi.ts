@@ -1,4 +1,4 @@
-import type { Profile } from '../types/github'
+import type { Profile, Repository } from '../types/github'
 
 const API_URL = 'https://api.github.com'
 
@@ -44,7 +44,7 @@ function toError(response: Response): GitHubError {
 }
 
 /** Anonymous GET; an abort rejects with the original AbortError, never a domain error. */
-async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function request<T>(path: string, signal?: AbortSignal): Promise<{ body: T; headers: Headers }> {
   let response: Response
   try {
     response = await fetch(`${API_URL}${path}`, {
@@ -57,7 +57,7 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   }
   if (!response.ok) throw new GitHubApiError(toError(response))
   try {
-    return (await response.json()) as T
+    return { body: (await response.json()) as T, headers: response.headers }
   } catch (error) {
     if (isAbort(error, signal)) throw error
     throw new GitHubApiError({ kind: 'unexpected', status: response.status })
@@ -65,7 +65,7 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 export async function getUser(login: string, signal?: AbortSignal): Promise<Profile> {
-  const user = await request<Profile>(`/users/${encodeURIComponent(login)}`, signal)
+  const { body: user } = await request<Profile>(`/users/${encodeURIComponent(login)}`, signal)
   return {
     login: user.login,
     name: user.name ?? null,
@@ -76,5 +76,51 @@ export async function getUser(login: string, signal?: AbortSignal): Promise<Prof
     followers: user.followers,
     following: user.following,
     public_repos: user.public_repos,
+  }
+}
+
+const REPOSITORIES_PER_PAGE = 100
+
+// `link: <…?page=2>; rel="next", <…?page=3>; rel="last"`; GitHub omits it on a single page.
+function hasNextPage(headers: Headers): boolean {
+  const link = headers.get('link') ?? ''
+  return link.split(',').some((part) => /;\s*rel="next"/.test(part))
+}
+
+function toRepository(repository: Repository): Repository {
+  return {
+    id: repository.id,
+    name: repository.name,
+    full_name: repository.full_name,
+    html_url: repository.html_url,
+    description: repository.description ?? null,
+    stargazers_count: repository.stargazers_count,
+    language: repository.language ?? null,
+    updated_at: repository.updated_at,
+  }
+}
+
+/**
+ * Every public repository of `login`, one page at a time: page N+1 is requested only after
+ * page N arrived and only while its `link` header has rel="next". Any failing page rejects
+ * the whole list.
+ */
+export async function getRepositories(
+  login: string,
+  options: { signal?: AbortSignal; onPage?: (page: number) => void } = {},
+): Promise<Repository[]> {
+  const { signal, onPage } = options
+  const repositories: Repository[] = []
+  for (let page = 1; ; page += 1) {
+    onPage?.(page)
+    const { body, headers } = await request<Repository[]>(
+      `/users/${encodeURIComponent(login)}/repos?per_page=${REPOSITORIES_PER_PAGE}&page=${page}`,
+      signal,
+    )
+    // A response that ignored the abort must not lead to the next page.
+    signal?.throwIfAborted()
+    if (!Array.isArray(body)) throw new GitHubApiError({ kind: 'unexpected', status: 200 })
+    repositories.push(...body.map(toRepository))
+    if (!hasNextPage(headers)) return repositories
   }
 }
