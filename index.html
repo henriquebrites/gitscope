@@ -5,6 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GitHub Explorer</title>
+    <script>
+      // Applies the theme before the first paint: the stored choice, else the system's.
+      // src/theme/theme.ts keeps it in sync afterwards.
+      ;(function () {
+        var theme = null
+        try {
+          theme = localStorage.getItem('github-explorer:theme')
+        } catch (error) {
+          theme = null
+        }
+        if (theme !== 'light' && theme !== 'dark') {
+          var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          theme = dark ? 'dark' : 'light'
+        }
+        document.documentElement.setAttribute('data-theme', theme)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

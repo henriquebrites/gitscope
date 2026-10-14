@@ -17,6 +17,14 @@ export const themeVariables: ReadonlyMap<string, string> = new Map(
     .map(([, name, value]) => [name, value.trim()]),
 )
 
+/** Body of the dark theme block, `:root[data-theme='dark']`, in src/index.css. */
+const darkBlock = css.match(/:root\[data-theme='dark'\]\s*{([\s\S]*?)\n}/)?.[1] ?? ''
+
+/** Color tokens the dark theme redefines, e.g. `color-ink` -> `#ededed`. */
+export const darkThemeVariables: ReadonlyMap<string, string> = new Map(
+  [...darkBlock.matchAll(/--(color-[a-z0-9-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]),
+)
+
 /** Token names of one group, without the namespace prefix (`color-ink` -> `ink`). */
 export function tokensOf(group: TokenGroup): string[] {
   const prefix = `${group}-`

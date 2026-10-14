@@ -98,6 +98,55 @@
   --radius-full: 9999px;
 }
 
+/*
+ * Dark theme: the same color tokens with other values, switched on <html data-theme>. The
+ * attribute is set before the first paint by the script in index.html. Every text token is
+ * AA 4.5:1 on canvas, canvas-elevated and hairline-soft; focus follows link, as in light.
+ * Gradient and accent colors are the same in both themes.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #0a0a0a;
+  --color-canvas-elevated: #141414;
+  --color-hairline: #2a2a2a;
+  --color-hairline-soft: #1f1f1f;
+  --color-ink: #ededed;
+  --color-body: #a1a1a1;
+  --color-mute: #8f8f8f;
+  --color-faint: #8a8a8a;
+  --color-link: #52a8ff;
+  --color-link-deep: #7bbcff;
+  --color-error: #ff6166;
+  --color-error-deep: #ff8a8f;
+  --color-warning-deep: #f5a623;
+  --color-primary: #ededed;
+  --color-on-primary: #0a0a0a;
+  --color-focus: #52a8ff;
+  --hero-glow-opacity: 0.35;
+}
+
+/* DESIGN.md reserves the gradients for the hero; Vitrine extends them to the profile cover and
+ * the repository band. Never behind body text. */
+@utility gradient-vitrine {
+  background-image: linear-gradient(
+    110deg,
+    var(--color-gradient-develop-start),
+    var(--color-gradient-develop-end) 45%,
+    var(--color-gradient-preview-start) 75%,
+    var(--color-gradient-preview-end)
+  );
+}
+
+/* Soft colour behind the hero title (large text, 3:1), faded out inside its own box. */
+@utility hero-glow {
+  opacity: var(--hero-glow-opacity, 0.55);
+  background-image:
+    radial-gradient(40% 70% at 15% 50%, var(--color-gradient-develop-end), transparent 70%),
+    radial-gradient(35% 70% at 45% 40%, var(--color-gradient-develop-start), transparent 70%),
+    radial-gradient(35% 70% at 75% 55%, var(--color-gradient-preview-end), transparent 70%),
+    radial-gradient(30% 60% at 95% 30%, var(--color-gradient-ship-end), transparent 70%);
+}
+
 @layer base {
   body {
     @apply bg-canvas font-sans text-body-md text-body antialiased;
