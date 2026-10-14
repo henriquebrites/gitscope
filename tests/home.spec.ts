@@ -1,6 +1,4 @@
-import { expect, test } from '@playwright/test'
-
-const localHosts = new Set(['localhost', '127.0.0.1'])
+import { expect, localHosts, test } from './support/test.js'
 
 test('opens the home page', async ({ page }) => {
   await page.goto('/')
