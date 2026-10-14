@@ -31,7 +31,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
             <div
               key={label}
               data-testid="profile-tile"
-              className="flex min-w-0 flex-col-reverse gap-1 rounded-md border border-hairline bg-canvas p-2 sm:px-3"
+              className="flex min-w-0 flex-col-reverse gap-1 rounded-md border border-hairline bg-canvas px-1 py-2 sm:px-3"
             >
               <dt className="text-body-sm text-mute">{label}</dt>
               <dd className="text-label-sm whitespace-nowrap text-ink tabular-nums sm:text-heading-md">
