@@ -2,32 +2,39 @@
 
 O GitHub Explorer é uma aplicação web (SPA) que consulta a API pública do
 GitHub: você busca um usuário, vê o perfil público, navega pelos repositórios
-ordenados e abre o detalhe de cada um. Este documento explica o que a
-aplicação faz, como instalar, testar e gerar o build, e por que as principais
-decisões foram tomadas.
+ordenados e abre o detalhe de cada um, com o README do projeto. Este documento
+explica o que a aplicação faz, como instalar, testar e gerar o build, e por que
+as principais decisões foram tomadas.
 
 ## Funcionalidades
 
 A aplicação cobre a busca, o perfil, a lista e o detalhe de repositórios, com
 estados de carregamento, erro e vazio em cada tela.
 
-- **Busca de usuário:** o campo fica no cabeçalho de todas as telas, remove
-  espaços extras, recusa entrada vazia com orientação e desabilita o envio
-  enquanto o perfil carrega.
-- **Perfil público:** avatar, login, nome, seguidores, seguindo, bio, e-mail
-  público e link para o perfil no GitHub; campos ausentes são omitidos ou
-  substituídos, nunca exibidos como `null`.
+- **Busca de usuário:** cada tela tem um único campo de busca: o do destaque da
+  página inicial, com três contas de exemplo, ou o do cabeçalho nas demais
+  rotas. A busca remove espaços extras, recusa entrada vazia com orientação e
+  desabilita o envio enquanto o perfil carrega.
+- **Perfil público:** capa, avatar, login, nome, bio, e-mail público, link para
+  o perfil no GitHub e três métricas (seguidores, seguindo e repositórios
+  públicos); campos ausentes são omitidos ou substituídos, nunca exibidos como
+  `null`.
 - **Lista de repositórios:** todas as páginas da API são carregadas antes da
-  exibição; a lista começa por estrelas (maior para menor), com desempate pelo
-  nome, e pode ser ordenada por estrelas (menor para maior), nome (A a Z) ou
-  última atualização. A paginação visual mostra 30 itens por página.
-- **Detalhe do repositório:** nome, descrição, estrelas, linguagem e link para o
-  GitHub. A rota abre por acesso direto, refresh ou link compartilhado, e o
-  link de volta restaura a ordenação e a página da lista.
+  exibição. Os cards ficam em duas colunas a partir de 640 px. A ordenação, em
+  pílulas, começa por mais estrelas, com desempate pelo nome, e oferece menos
+  estrelas, nome (A a Z) e última atualização. A paginação mostra 30 itens por
+  página, com páginas numeradas a partir de 640 px.
+- **Detalhe do repositório:** nome, descrição, estrelas, linguagem, link para o
+  GitHub e o README do repositório, sanitizado antes de chegar à página. A rota
+  abre por acesso direto, refresh ou link compartilhado, e o link de volta
+  restaura a ordenação e a página da lista.
+- **Tema claro e escuro:** segue o tema do sistema até que você escolha um pelo
+  botão do cabeçalho; a escolha fica salva no navegador e vale desde o
+  primeiro quadro, sem piscar no tema errado.
 - **Tratamento de falhas:** mensagens específicas para conta ou repositório não
   encontrado, falha de rede, limite de requisições da API (com o horário de
   liberação) e erro inesperado. Se só os repositórios falharem, o perfil
-  continua visível.
+  continua visível; se só o README falhar, o detalhe continua visível.
 - **Acessibilidade e responsividade:** funciona a partir de 320 × 480 px sem
   rolagem horizontal, com foco visível, navegação por teclado e regiões
   `aria-live` (carregamento) e `role="alert"` (erros).
@@ -47,10 +54,14 @@ são as instaladas pelo `package-lock.json`.
 | Fontes auto-hospedadas | `@fontsource-variable/geist` e `geist-mono` | 5.3.0 |
 | Testes unitários e de componentes | Vitest, React Testing Library e jsdom | 5.0.4, 16.3.3, 30.1.2 |
 | Testes end-to-end | Playwright (Chromium) | 1.64.0 |
+| Sanitização do README | DOMPurify | 3.4.17 |
 | Lint | ESLint | 10.12.0 |
 
 O estado compartilhado usa Context API com `useReducer`, e as chamadas HTTP
-usam a Fetch API, sem bibliotecas adicionais.
+usam a Fetch API. O DOMPurify é a única dependência de runtime além de React,
+React Router, Tailwind e as fontes: todo HTML de README passa por ele, que
+remove scripts, iframes, estilos, formulários e atributos de evento, e os links
+externos abrem em nova aba com `noopener`.
 
 ## Pré-requisitos
 
@@ -120,19 +131,28 @@ mobile, siga estas etapas:
     ```
 
 2.  Em outro terminal, crie a pasta dos relatórios e rode o Lighthouse pelo
-    `npx`. O Lighthouse 13.5.0 exige Node.js 22.19 ou mais recente e usa o
-    Google Chrome instalado:
+    `npx`, uma vez em cada tema. O Lighthouse 13.5.0 exige Node.js 22.19 ou
+    mais recente e usa o Google Chrome instalado. A opção
+    `preferredColorScheme` emula `prefers-color-scheme` (`1` claro, `0`
+    escuro), independentemente do tema do sistema operacional:
 
     ```bash
     mkdir -p lighthouse
     npx lighthouse@13.5.0 http://localhost:4173/ --form-factor=mobile \
-      --output=json --output=html --output-path=./lighthouse/home \
-      --chrome-flags="--headless=new"
+      --output=json --output=html --output-path=./lighthouse/home-light \
+      --chrome-flags="--headless=new --blink-settings=preferredColorScheme=1"
+    npx lighthouse@13.5.0 http://localhost:4173/ --form-factor=mobile \
+      --output=json --output=html --output-path=./lighthouse/home-dark \
+      --chrome-flags="--headless=new --blink-settings=preferredColorScheme=0"
     ```
 
 Os relatórios ficam em `lighthouse/`, pasta ignorada pelo Git. A última
-medição, em 13 de outubro de 2026, deu Performance 98, Accessibility 100,
-Best Practices 100 e SEO 82.
+medição, em 14 de outubro de 2026, deu:
+
+| Tema | Performance | Accessibility | Best Practices | SEO |
+| --- | --- | --- | --- | --- |
+| Claro | 95 | 100 | 100 | 83 |
+| Escuro | 98 | 100 | 100 | 83 |
 
 ## Estrutura de pastas
 
@@ -144,16 +164,18 @@ src/
   app/          rotas (data mode) e App; testes de rota com createMemoryRouter
   components/
     feedback/   conteúdo de erro compartilhado entre as telas
-    layout/     cabeçalho, layout e container de página
+    layout/     cabeçalho, botão de tema, layout e container de página
     profile/    cartão, skeleton e erros do perfil
-    repositories/  lista, item, ordenação, paginação e detalhe
+    repositories/  lista, item, ordenação, paginação, detalhe e README
     search/     formulário de busca
   context/      GitHubContext, provider e reducer (cache em memória)
-  hooks/        useProfile, useRepositories e useRepository
+  hooks/        useProfile, useRepositories, useRepository e useReadme
   pages/        HomePage, UserPage, RepositoryPage, NotFoundPage, RouteErrorPage
   services/     githubApi: URLs, fetch, paginação e erros de domínio
+  theme/        tema claro ou escuro: escolha salva e preferência do sistema
   types/        tipos da API e do domínio
-  utils/        ordenação, formatação pt-BR, paginação e query da lista
+  utils/        ordenação, formatação pt-BR, paginação, query da lista, cores
+                de linguagem e sanitização do README
   test/         setup do Vitest e testes de tokens e camadas
 tests/          specs Playwright e stubs da API (tests/support/)
 ```
@@ -190,21 +212,49 @@ não ficam evidentes só pelo código.
 - **Respostas obsoletas são descartadas.** Ao trocar de usuário ou sair da tela,
   as requisições em curso são canceladas com `AbortController`, e nenhum dado
   de outro usuário aparece como atual.
+- **O README é um domínio de falha próprio.** Ele é pedido com
+  `Accept: application/vnd.github.html+json` só depois que o repositório está
+  na tela, e a falha dele nunca esconde o detalhe. Um repositório sem README
+  (`404`) é um estado vazio, não um erro. Cada repositório gasta no máximo uma
+  requisição de README por sessão: o README e a ausência dele ficam no cache em
+  memória, e as falhas não, para que reabrir o repositório tente de novo.
+- **O tema troca valores, não componentes.** O atributo `data-theme` do
+  `<html>` recebe `light` ou `dark` de um script no `index.html`, antes da
+  primeira pintura, e o tema escuro redefine os mesmos tokens de cor. Nenhum
+  componente usa a variante `dark:`. A escolha fica em
+  `localStorage["github-explorer:theme"]`; sem ela, o tema segue o sistema.
 
 ### Ajustes de tokens visuais
 
 Os tokens visuais seguem o design system da Vercel (Geist), mapeados no
-`@theme` do Tailwind em `src/index.css`. Seis tokens de cor de texto foram
-escurecidos para atingir contraste WCAG AA de 4,5:1 sobre os fundos usados:
+`@theme` do Tailwind em `src/index.css`. No tema claro, seis tokens de cor de
+texto foram escurecidos para atingir contraste WCAG AA de 4,5:1 sobre os
+fundos usados. O tema escuro, que o design system não define, redefine os
+tokens abaixo em `:root[data-theme='dark']`; todo token de texto escuro também
+passa de 4,5:1 sobre `canvas`, `canvas-elevated` e `hairline-soft`.
 
-| Token | Original | Ajustado |
-| --- | --- | --- |
-| `mute` | `#8f8f8f` | `#636363` |
-| `faint` | `#a1a1a1` | `#6b6b6b` |
-| `link` | `#0070f3` | `#0761d1` |
-| `link-deep` | `#0761d1` | `#0550b0` |
-| `error` | `#ee0000` | `#c50000` |
-| `error-deep` | `#c50000` | `#a30000` |
+| Token | Original | Claro (ajustado) | Escuro |
+| --- | --- | --- | --- |
+| `mute` | `#8f8f8f` | `#636363` | `#8f8f8f` |
+| `faint` | `#a1a1a1` | `#6b6b6b` | `#8a8a8a` |
+| `link` | `#0070f3` | `#0761d1` | `#52a8ff` |
+| `link-deep` | `#0761d1` | `#0550b0` | `#7bbcff` |
+| `error` | `#ee0000` | `#c50000` | `#ff6166` |
+| `error-deep` | `#c50000` | `#a30000` | `#ff8a8f` |
+| `canvas` | `#fafafa` | `#fafafa` | `#0a0a0a` |
+| `canvas-elevated` | `#ffffff` | `#ffffff` | `#141414` |
+| `hairline` | `#ebebeb` | `#ebebeb` | `#2a2a2a` |
+| `hairline-soft` | `#f2f2f2` | `#f2f2f2` | `#1f1f1f` |
+| `ink` | `#171717` | `#171717` | `#ededed` |
+| `body` | `#4d4d4d` | `#4d4d4d` | `#a1a1a1` |
+| `warning-deep` | `#ab570a` | `#ab570a` | `#f5a623` |
+| `primary` | `#171717` | `#171717` | `#ededed` |
+| `on-primary` | `#ffffff` | `#ffffff` | `#0a0a0a` |
+| `focus` (= `link`) | `#0070f3` | `#0761d1` | `#52a8ff` |
+
+As cores de gradiente não mudam entre os temas e ficam só na capa do perfil,
+no fio do detalhe e no brilho atrás do título da página inicial, nunca atrás
+de texto corrido.
 
 ## Próximos passos
 

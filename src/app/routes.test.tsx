@@ -4,7 +4,7 @@ import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { deferred, githubFetch, jsonResponse, octocat } from '../test/github'
+import { deferred, githubFetch, jsonResponse, octocat, repositoriesOf } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -218,6 +218,21 @@ describe('routes', () => {
 
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
+    const { spacing, offScale } = await spacingReport(rawClasses)
+    expect(spacing.length, 'spacing').toBeGreaterThan(0)
+    expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])
+  })
+
+  it.each([
+    ['home with hero and examples', '/', () => screen.getByTestId('hero-glow')],
+    ['profile with cover, tiles and pager', '/users/octocat', () => screen.findByRole('navigation', { name: 'Páginas de repositórios' })],
+    ['detail with README', '/users/octocat/repos/hello-world', () => screen.findByTestId('readme-content')],
+  ])('spacing on the loaded %s', async (_name, path, ready) => {
+    fetchSpy.mockImplementation(githubFetch({ octocat: repositoriesOf('r', 45) }))
+    const { container } = renderAt(path)
+    await ready()
+    const rawClasses = usedClasses(container)
+
     const { spacing, offScale } = await spacingReport(rawClasses)
     expect(spacing.length, 'spacing').toBeGreaterThan(0)
     expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])
