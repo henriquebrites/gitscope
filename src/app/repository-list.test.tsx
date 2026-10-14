@@ -43,8 +43,18 @@ const itemNames = () =>
   within(section())
     .queryAllByRole('listitem')
     .map((item) => within(item).getByRole('link').textContent)
-const sortSelect = () => within(section()).getByRole('combobox', { name: 'Ordenar por' })
-const selectedSort = () => (sortSelect() as HTMLSelectElement).selectedOptions[0].textContent
+const sortGroup = () => within(section()).getByRole('radiogroup', { name: 'Ordenar por' })
+const sortOption = (name: string) => within(sortGroup()).getByRole('radio', { name })
+const selectedSort = () =>
+  (within(sortGroup()).getAllByRole('radio') as HTMLInputElement[]).find((radio) => radio.checked)?.closest('label')
+    ?.textContent
+/** The pager shows page `page` of `total`: the current number, and the compact "p de N". */
+function expectPage(page: number, total: number) {
+  const pager = within(section()).getByRole('navigation', { name: 'Páginas de repositórios' })
+  expect(within(pager).getByRole('button', { name: `Página ${page}` })).toHaveAttribute('aria-current', 'page')
+  expect(within(pager).getByTestId('pager-compact')).toHaveTextContent(`${page} de ${total}`)
+  expect(within(pager).getByTestId('pager-numbers').querySelectorAll('[aria-current="page"]')).toHaveLength(1)
+}
 const reposUrl = (login: string, page: number) =>
   `https://api.github.com/users/${login}/repos?per_page=100&page=${page}`
 
@@ -215,7 +225,7 @@ describe('repository list route', () => {
     await loaded('/users/octocat', { octocat: pages.flat() })
 
     expect(itemNames()[0]).toBe('star-of-page-3')
-    expect(within(section()).getByText('Página 1 de 8')).toBeVisible()
+    expectPage(1, 8)
   })
 
   it('invalid sort falls back to stars, most first', async () => {
@@ -223,7 +233,7 @@ describe('repository list route', () => {
       octocat: [repositoryOf('few', { stargazers_count: 1 }), repositoryOf('many', { stargazers_count: 9 })],
     })
 
-    expect(selectedSort()).toBe('Estrelas — maior para menor')
+    expect(selectedSort()).toBe('Mais estrelas')
     expect(itemNames()).toEqual(['many', 'few'])
   })
 
@@ -235,7 +245,7 @@ describe('repository list route', () => {
       ],
     })
 
-    expect(selectedSort()).toBe('Atualização — mais recente')
+    expect(selectedSort()).toBe('Atualização')
     expect(itemNames()).toEqual(['newer', 'older'])
   })
 
@@ -244,18 +254,67 @@ describe('repository list route', () => {
     const { router, newRequests } = await loaded('/users/octocat?page=3', { octocat: repositories })
     expect(itemNames()[0]).toBe('r-010')
 
-    await userEvent.setup().selectOptions(sortSelect(), 'Nome — A a Z')
+    await userEvent.setup().click(sortOption('Nome'))
 
     expect(router.state.location.search).toBe('?sort=name-asc&page=1')
     expect(itemNames()[0]).toBe('r-001')
-    expect(within(section()).getByText('Página 1 de 3')).toBeVisible()
+    expectPage(1, 3)
+    expect(newRequests()).toBe(0)
+  })
+
+  it.each([
+    ['?sort=stars-desc', 'Mais estrelas'],
+    ['?sort=stars-asc', 'Menos estrelas'],
+    ['?sort=name-asc', 'Nome'],
+    ['?sort=updated-desc', 'Atualização'],
+    ['?sort=STARS-ASC', 'Mais estrelas'],
+    ['', 'Mais estrelas'],
+  ])('sort pill reflects the URL (%s)', async (query, checked) => {
+    await loaded(`/users/octocat${query}`, { octocat: repositoriesOf('r', 3) })
+
+    expect(within(sortGroup()).getAllByRole('radio').map((radio) => radio.closest('label')?.textContent)).toEqual([
+      'Mais estrelas',
+      'Menos estrelas',
+      'Nome',
+      'Atualização',
+    ])
+    expect(selectedSort()).toBe(checked)
+    expect(sortOption(checked)).toBeChecked()
+  })
+
+  it('choosing a sort pill pushes sort and page=1 and shows that first page', async () => {
+    const repositories = repositoriesOf('r', 70, (index) => index)
+    const { router, newRequests } = await loaded('/users/octocat?page=3', { octocat: repositories })
+
+    await userEvent.setup().click(sortOption('Menos estrelas'))
+
+    expect(router.state.location.search).toBe('?sort=stars-asc&page=1')
+    expect(router.state.historyAction).toBe('PUSH')
+    expect(itemNames()).toEqual(repositories.slice(0, 30).map((repository) => repository.name))
+    expect(sortOption('Menos estrelas')).toBeChecked()
+    expectPage(1, 3)
+    expect(newRequests()).toBe(0)
+  })
+
+  it('page number keeps the sort, pushes the page and keeps the focus on it', async () => {
+    const { router, newRequests } = await loaded('/users/octocat?sort=name-asc', { octocat: repositoriesOf('r', 70) })
+    const pager = within(section()).getByRole('navigation', { name: 'Páginas de repositórios' })
+
+    await userEvent.setup().click(within(pager).getByRole('button', { name: 'Página 3' }))
+
+    expect(router.state.location.search).toBe('?sort=name-asc&page=3')
+    expect(router.state.historyAction).toBe('PUSH')
+    expect(itemNames()[0]).toBe('r-061')
+    const current = within(pager).getByRole('button', { name: 'Página 3' })
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(current).toHaveFocus()
     expect(newRequests()).toBe(0)
   })
 
   it('out of range page shows page 1', async () => {
     await loaded('/users/octocat?page=99', { octocat: repositoriesOf('r', 37) })
 
-    expect(within(section()).getByText('Página 1 de 2')).toHaveAttribute('aria-current', 'page')
+    expectPage(1, 2)
     expect(itemNames()[0]).toBe('r-001')
   })
 
@@ -273,7 +332,7 @@ describe('repository list route', () => {
 
     await userEvent.setup().click(within(section()).getByRole('button', { name: 'Próxima' }))
     expect(router.state.location.search).toBe('?sort=name-asc&page=2')
-    expect(within(section()).getByText('Página 2 de 3')).toHaveAttribute('aria-current', 'page')
+    expectPage(2, 3)
 
     within(section()).getByRole('button', { name: 'Anterior' }).focus()
     await userEvent.setup().keyboard('{Enter}')
@@ -289,12 +348,12 @@ describe('repository list route', () => {
     const button = (name: string) => within(section()).getByRole('button', { name })
 
     await activate(button('Próxima'))
-    expect(within(section()).getByText('Página 2 de 2')).toBeVisible()
+    expectPage(2, 2)
     expect(button('Próxima')).toBeDisabled()
     expect(button('Anterior')).toHaveFocus()
 
     await activate(button('Anterior'))
-    expect(within(section()).getByText('Página 1 de 2')).toBeVisible()
+    expectPage(1, 2)
     expect(button('Anterior')).toBeDisabled()
     expect(button('Próxima')).toHaveFocus()
   })
@@ -305,7 +364,7 @@ describe('repository list route', () => {
 
     await userEvent.setup().click(next)
 
-    expect(within(section()).getByText('Página 2 de 3')).toBeVisible()
+    expectPage(2, 3)
     expect(next).toHaveFocus()
   })
 
@@ -332,8 +391,9 @@ describe('repository list route', () => {
 
     expect(router.state.location.pathname).toBe('/users/octocat')
     expect(router.state.location.search).toBe('?sort=name-asc&page=2')
-    expect(await within(await findSection()).findByText('Página 2 de 2')).toBeVisible()
-    expect(selectedSort()).toBe('Nome — A a Z')
+    await within(await findSection()).findByText('2 de 2')
+    expectPage(2, 2)
+    expect(selectedSort()).toBe('Nome')
     expect(itemNames()[0]).toBe('r-031')
     expect(newRequests()).toBe(0)
   })
@@ -349,7 +409,7 @@ describe('repository list route', () => {
     expect(router.state.location.pathname).toBe('/users/other')
     expect(router.state.location.search).toBe('')
     await within(await findSection()).findAllByRole('listitem')
-    expect(selectedSort()).toBe('Estrelas — maior para menor')
-    expect(within(section()).getByText('Página 1 de 2')).toBeVisible()
+    expect(selectedSort()).toBe('Mais estrelas')
+    expectPage(1, 2)
   })
 })

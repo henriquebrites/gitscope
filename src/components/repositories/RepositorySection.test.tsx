@@ -66,7 +66,7 @@ describe('RepositorySection', () => {
     expect(region).toHaveTextContent(/^Carregando repositórios… \(página 3\)$/)
     expect(region).not.toHaveClass('sr-only')
     expect(within(section).queryByRole('list')).not.toBeInTheDocument()
-    expect(within(section).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(within(section).queryByRole('radiogroup')).not.toBeInTheDocument()
   })
 
   it('outside loading the live region is empty', () => {
@@ -126,32 +126,42 @@ describe('RepositorySection', () => {
     expect(within(section).queryByRole('list')).not.toBeInTheDocument()
   })
 
-  it('sort control: visible label, the four options in order, the current one selected', () => {
-    const { section } = renderSection(success(3), { sort: 'updated-desc' })
+  const sortLabels: [SortKey, string][] = [
+    ['stars-desc', 'Mais estrelas'],
+    ['stars-asc', 'Menos estrelas'],
+    ['name-asc', 'Nome'],
+    ['updated-desc', 'Atualização'],
+  ]
 
-    const select = within(section).getByRole('combobox', { name: 'Ordenar por' })
-    expect(select.tagName).toBe('SELECT')
-    expect(within(section).getByText('Ordenar por').tagName).toBe('LABEL')
-    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'Estrelas — maior para menor',
-      'Estrelas — menor para maior',
-      'Nome — A a Z',
-      'Atualização — mais recente',
+  it.each(sortLabels)('sort pills: one-choice group "Ordenar por", %s checks "%s"', (sort, label) => {
+    const { section } = renderSection(success(3), { sort })
+
+    const group = within(section).getByRole('radiogroup', { name: 'Ordenar por' })
+    const radios = within(group).getAllByRole('radio')
+    expect(radios.map((radio) => radio.closest('label')?.textContent)).toEqual(sortLabels.map(([, name]) => name))
+    expect(radios.map((radio) => (radio as HTMLInputElement).value)).toEqual(sortLabels.map(([key]) => key))
+    expect(new Set(radios.map((radio) => (radio as HTMLInputElement).name)).size).toBe(1)
+    expect(radios.filter((radio) => (radio as HTMLInputElement).checked)).toEqual([
+      within(group).getByRole('radio', { name: label }),
     ])
-    expect(within(select).getByRole('option', { name: 'Atualização — mais recente' })).toHaveProperty(
-      'selected',
-      true,
-    )
   })
 
-  it('sort control reports the chosen key', async () => {
-    const { section, onSortChange } = renderSection(success(3))
+  it.each(sortLabels)('sort pills report the chosen key: %s by click', async (sort, label) => {
+    const other = sort === 'stars-desc' ? 'stars-asc' : 'stars-desc'
+    const { section, onSortChange } = renderSection(success(3), { sort: other })
 
-    await userEvent
-      .setup()
-      .selectOptions(within(section).getByRole('combobox', { name: 'Ordenar por' }), 'Nome — A a Z')
+    await userEvent.setup().click(within(section).getByRole('radio', { name: label }))
 
-    expect(onSortChange).toHaveBeenCalledWith('name-asc')
+    expect(onSortChange).toHaveBeenCalledWith(sort)
+  })
+
+  it('sort pills: the arrow keys move the choice', async () => {
+    const { section, onSortChange } = renderSection(success(3), { sort: 'stars-desc' })
+    const user = userEvent.setup()
+
+    within(section).getByRole('radio', { name: 'Mais estrelas' }).focus()
+    await user.keyboard('{ArrowRight}')
+    expect(onSortChange).toHaveBeenLastCalledWith('stars-asc')
   })
 
   it('shows 30 items of the requested page', () => {
@@ -162,12 +172,55 @@ describe('RepositorySection', () => {
     expect(items[0]).toHaveTextContent('repo-031')
   })
 
+  /** The numbered pager as it reads: numbers, `…` for gaps. */
+  function pagerSequence(pager: HTMLElement) {
+    return [...within(pager).getByTestId('pager-numbers').children].map((child) => child.textContent)
+  }
+
+  it.each<[number, string[]]>([
+    [5, ['1', '…', '4', '5', '6', '…', '10']],
+    [1, ['1', '2', '…', '10']],
+    [3, ['1', '2', '3', '4', '…', '10']],
+  ])('numbered pager: page %i of 10', (page, sequence) => {
+    const { section } = renderSection(success(300), { pageParam: String(page) })
+
+    const pager = within(section).getByRole('navigation', { name: 'Páginas de repositórios' })
+    const parts = [...pager.children].map((child) => child.textContent)
+    expect(parts[0]).toBe('Anterior')
+    expect(parts.at(-1)).toBe('Próxima')
+    expect(pagerSequence(pager)).toEqual(sequence)
+    const current = within(pager).getByRole('button', { name: `Página ${page}` })
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(pager.querySelectorAll('[aria-current]')).toHaveLength(1)
+    // Gaps are text, never a stop of the Tab key.
+    for (const gap of within(pager).getAllByText('…')) {
+      expect(gap.tagName).toBe('SPAN')
+      expect(gap).not.toHaveAttribute('tabindex')
+      expect(gap).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  it('numbered pager: a number reports its page', async () => {
+    const { section, onPageChange } = renderSection(success(300), { pageParam: '5' })
+
+    await userEvent.setup().click(within(section).getByRole('button', { name: 'Página 6' }))
+    expect(onPageChange).toHaveBeenCalledWith(6)
+    await userEvent.setup().click(within(section).getByRole('button', { name: 'Página 10' }))
+    expect(onPageChange).toHaveBeenLastCalledWith(10)
+  })
+
+  it('compact pager reads "p de N"', () => {
+    const { section } = renderSection(success(300), { pageParam: '3' })
+
+    expect(within(section).getByTestId('pager-compact')).toHaveTextContent(/^3 de 10$/)
+  })
+
   it('pager on the first page: Anterior disabled, current page marked', async () => {
     const { section, onPageChange } = renderSection(success(45))
 
     const pager = within(section).getByRole('navigation', { name: 'Páginas de repositórios' })
     expect(within(pager).getByRole('button', { name: 'Anterior' })).toBeDisabled()
-    expect(within(pager).getByText('Página 1 de 2')).toHaveAttribute('aria-current', 'page')
+    expect(within(pager).getByRole('button', { name: 'Página 1' })).toHaveAttribute('aria-current', 'page')
     const next = within(pager).getByRole('button', { name: 'Próxima' })
     expect(next).toBeEnabled()
 
@@ -180,7 +233,7 @@ describe('RepositorySection', () => {
 
     const pager = within(section).getByRole('navigation', { name: 'Páginas de repositórios' })
     expect(within(pager).getByRole('button', { name: 'Próxima' })).toBeDisabled()
-    expect(within(pager).getByText('Página 2 de 2')).toHaveAttribute('aria-current', 'page')
+    expect(within(pager).getByRole('button', { name: 'Página 2' })).toHaveAttribute('aria-current', 'page')
 
     within(pager).getByRole('button', { name: 'Anterior' }).focus()
     await userEvent.setup().keyboard('{Enter}')
@@ -192,7 +245,7 @@ describe('RepositorySection', () => {
 
     expect(within(section).getAllByRole('listitem')).toHaveLength(30)
     expect(within(section).queryByRole('navigation')).not.toBeInTheDocument()
-    expect(within(section).queryByText(/^Página/)).not.toBeInTheDocument()
+    expect(within(section).queryByTestId('pager-compact')).not.toBeInTheDocument()
   })
 
   it('sorts the whole list before slicing the page', () => {

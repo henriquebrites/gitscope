@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './support/test.js'
+import { expectPage } from './support/pager.js'
 import { expectFocusRing, expectVisualTabOrder, tabThrough } from './support/focus.js'
 import {
   json,
@@ -129,7 +130,7 @@ test('from the list: no repository request, and back to the same sort and page',
 
   await page.goto('/users/octocat?sort=name-asc&page=2')
   const list = page.getByRole('region', { name: 'Repositórios' })
-  await expect(list.getByText('Página 2 de 2')).toBeVisible()
+  await expectPage(page, list, 2, 2)
   await list.getByRole('link', { name: 'r-031' }).click()
 
   await expect(page).toHaveURL('/users/octocat/repos/r-031')
@@ -139,7 +140,7 @@ test('from the list: no repository request, and back to the same sort and page',
   await page.getByRole('link', { name: 'Voltar aos repositórios' }).click()
 
   await expect(page).toHaveURL('/users/octocat?sort=name-asc&page=2')
-  await expect(list.getByText('Página 2 de 2')).toBeVisible()
+  await expectPage(page, list, 2, 2)
   expect(repositories).toEqual([])
   expect(users).toEqual(['octocat'])
 })

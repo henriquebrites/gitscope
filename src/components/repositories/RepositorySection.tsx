@@ -40,7 +40,7 @@ function RepositorySection({
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 id={headingId} className="text-heading-md text-ink">
           Repositórios
         </h2>
@@ -58,7 +58,8 @@ function RepositorySection({
         <p className="text-body-md text-mute">Esta conta não tem repositórios públicos.</p>
       )}
       {visible.length > 0 && (
-        <ul className="flex flex-col gap-3">
+        // Two columns from 640px; grid rows stretch, so cards side by side share one height.
+        <ul data-testid="repository-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visible.map((repository) => (
             <RepositoryItem key={repository.id} repository={repository} login={login} />
           ))}

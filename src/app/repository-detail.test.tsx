@@ -178,7 +178,7 @@ describe('repository detail route', () => {
     fetchSpy.mockImplementation(githubFetch({ octocat: repositoriesOf('r', 45) }))
     const router = renderAt('/users/octocat?sort=name-asc&page=2')
     const list = await within(main()).findByRole('region', { name: 'Repositórios' })
-    await within(list).findByText('Página 2 de 2')
+    await within(list).findByText('2 de 2')
     const requestsBefore = fetchSpy.mock.calls.length
     const user = userEvent.setup()
 
@@ -193,7 +193,7 @@ describe('repository detail route', () => {
     expect(router.state.location.pathname).toBe('/users/octocat')
     expect(router.state.location.search).toBe('?sort=name-asc&page=2')
     const back = within(main()).getByRole('region', { name: 'Repositórios' })
-    expect(within(back).getByText('Página 2 de 2')).toBeVisible()
+    expect(within(back).getByRole('button', { name: 'Página 2' })).toHaveAttribute('aria-current', 'page')
     expect(fetchSpy.mock.calls.length).toBe(requestsBefore)
   })
 })
