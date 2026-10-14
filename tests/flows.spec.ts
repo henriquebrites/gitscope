@@ -5,8 +5,9 @@ import { expect, test } from './support/test.js'
 const profileHeading = (page: Page, login = 'octocat') =>
   page.getByRole('region', { name: 'Perfil' }).getByRole('heading', { level: 1, name: login })
 const repositories = (page: Page) => page.getByRole('region', { name: 'Repositórios' })
+// Each screen has one search: the hero's on the home page, the header's elsewhere.
 const searchField = (page: Page) =>
-  page.getByRole('banner').getByRole('textbox', { name: 'Nome de usuário do GitHub' })
+  page.getByRole('search').getByRole('textbox', { name: 'Nome de usuário do GitHub' })
 
 /** Counts requests to the profile and to the repository list endpoints. */
 function countApiRequests(page: Page) {

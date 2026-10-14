@@ -115,7 +115,8 @@ describe('user profile route', () => {
     await act(async () => pending.reject(abortError()))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(consoleError).not.toHaveBeenCalled()
-    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Buscar' })).toBeEnabled()
+    // The home's one search, in the hero, is not left waiting on the aborted profile.
+    expect(within(screen.getByRole('search')).getByRole('button', { name: 'Buscar' })).toBeEnabled()
   })
 
   it('serves a visited profile from the cache', async () => {

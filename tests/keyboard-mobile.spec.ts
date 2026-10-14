@@ -19,6 +19,7 @@ const scrollWidth = (page: Page) => page.evaluate(() => document.documentElement
 
 test.describe('no horizontal scroll', () => {
   test('no horizontal scroll: home', async ({ page }) => {
+    await stubGitHub(page)
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     expect(await scrollWidth(page)).toBeLessThanOrEqual(320)

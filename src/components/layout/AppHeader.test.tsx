@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -51,12 +51,12 @@ describe('AppHeader', () => {
 
   it('clears the field when the location changes', async () => {
     const user = userEvent.setup()
-    const router = renderHeader('/')
+    const router = renderHeader('/foo')
 
     await user.type(field(), 'typed')
-    await router.navigate('/foo')
+    await router.navigate('/bar')
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/foo'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/bar'))
     await waitFor(() => expect(field()).toHaveValue(''))
   })
 
@@ -64,6 +64,31 @@ describe('AppHeader', () => {
     renderHeader('/users/octocat', true)
 
     expect(screen.getByRole('button', { name: 'Buscando…' })).toBeDisabled()
+  })
+
+  it('no search on the home route: wordmark and theme only', () => {
+    renderHeader('/')
+
+    const banner = screen.getByRole('banner')
+    expect(within(banner).queryByRole('search')).not.toBeInTheDocument()
+    expect(within(banner).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(within(banner).getByRole('link', { name: 'GitHub Explorer' })).toHaveAttribute('href', '/')
+    expect(within(banner).getAllByRole('button')).toHaveLength(1)
+    expect(within(banner).getByRole('button', { name: 'Usar tema escuro' })).toBeInTheDocument()
+  })
+
+  it('other routes: search between two theme placements, one per layout', () => {
+    renderHeader('/users/octocat')
+
+    const banner = screen.getByRole('banner')
+    expect(within(banner).getByRole('search')).toBeInTheDocument()
+    const toggles = within(banner).getAllByRole('button', { name: 'Usar tema escuro' })
+    expect(toggles).toHaveLength(2)
+    expect(toggles[0]).toHaveClass('sm:hidden')
+    expect(toggles[1]).toHaveClass('hidden', 'sm:inline-flex')
+    const search = within(banner).getByRole('search')
+    expect(toggles[0].compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(search.compareDocumentPosition(toggles[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('links the wordmark to the home page', () => {

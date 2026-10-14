@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import SearchForm from './SearchForm'
+import SearchForm, { type SearchVariant } from './SearchForm'
 
-function renderForm(isLoading = false) {
+function renderForm(isLoading = false, variant: SearchVariant = 'header') {
   const onSearch = vi.fn()
-  const view = render(<SearchForm isLoading={isLoading} onSearch={onSearch} />)
+  const view = render(<SearchForm isLoading={isLoading} onSearch={onSearch} variant={variant} />)
   const field = screen.getByRole('textbox', { name: 'Nome de usuário do GitHub' })
   return { ...view, onSearch, field }
 }
@@ -27,14 +27,16 @@ describe('SearchForm', () => {
     expect(field).not.toHaveAttribute('aria-invalid', 'true')
   })
 
-  it.each([
-    ['empty', 'click', ''],
-    ['empty', 'enter', ''],
-    ['spaces only', 'click', '   '],
-    ['spaces only', 'enter', '   '],
-  ])('rejects a blank search (%s via %s)', async (_label, trigger, typed) => {
+  it.each(
+    (['hero', 'header'] as const).flatMap((variant) => [
+      [variant, 'empty', 'click', ''],
+      [variant, 'empty', 'enter', ''],
+      [variant, 'spaces only', 'click', '   '],
+      [variant, 'spaces only', 'enter', '   '],
+    ]),
+  )('rejects a blank search (%s, %s via %s)', async (variant, _label, trigger, typed) => {
     const user = userEvent.setup()
-    const { field, onSearch } = renderForm()
+    const { field, onSearch } = renderForm(false, variant)
 
     if (typed) await user.type(field, typed)
     if (trigger === 'click') await user.click(screen.getByRole('button', { name: 'Buscar' }))
@@ -44,6 +46,20 @@ describe('SearchForm', () => {
     expect(field).toHaveAttribute('aria-invalid', 'true')
     expect(describedBy(field)).toContain('Digite um nome de usuário para buscar.')
     expect(field).toHaveFocus()
+    // Visible, right under the field's row: the next element after it.
+    const error = screen.getByText('Digite um nome de usuário para buscar.')
+    expect(error).not.toHaveClass('sr-only')
+    expect(screen.getByTestId('search-row').nextElementSibling).toBe(error)
+  })
+
+  it('hint: visible in the hero, for screen readers only in the header', () => {
+    const hint = 'Use o login exato da conta, por exemplo octocat.'
+    const hero = renderForm(false, 'hero')
+    expect(screen.getByText(hint)).not.toHaveClass('sr-only')
+    hero.unmount()
+
+    renderForm(false, 'header')
+    expect(screen.getByText(hint)).toHaveClass('sr-only')
   })
 
   it('trims the login', async () => {
