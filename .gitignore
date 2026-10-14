@@ -34,6 +34,7 @@ AGENTS.md
 .tasks/
 .checks/
 .specs/
+.demos/
 skills-lock.json
 
 # Playwright
