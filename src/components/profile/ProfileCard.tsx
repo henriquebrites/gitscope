@@ -2,36 +2,45 @@ import type { Profile } from '../../types/github'
 import { formatCount } from '../../utils/formatters'
 
 function ProfileCard({ profile }: { profile: Profile }) {
-  const { login, name, avatar_url, html_url, bio, email, followers, following } = profile
+  const { login, name, avatar_url, html_url, bio, email, followers, following, public_repos } = profile
+  const tiles: [string, number][] = [
+    ['Seguidores', followers],
+    ['Seguindo', following],
+    ['Repositórios', public_repos],
+  ]
 
   return (
-    <article className="flex flex-col gap-6 rounded-md border border-hairline bg-canvas-elevated p-6 sm:flex-row sm:items-start">
-      <img
-        src={avatar_url}
-        alt={`Avatar de ${login}`}
-        width={96}
-        height={96}
-        className="size-24 shrink-0 rounded-full border border-hairline bg-hairline-soft"
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
+    <article className="overflow-hidden rounded-lg border border-hairline bg-canvas-elevated">
+      <div aria-hidden="true" data-testid="profile-cover" className="gradient-vitrine h-24" />
+      <div className="flex flex-col gap-4 px-3 pb-6 sm:px-6">
+        <img
+          src={avatar_url}
+          alt={`Avatar de ${login}`}
+          width={96}
+          height={96}
+          className="-mt-10 size-24 shrink-0 rounded-full border-4 border-canvas-elevated bg-hairline-soft"
+        />
         <div className="flex flex-col gap-1">
           <h1 className="text-heading-lg break-words text-ink">{login}</h1>
           {name && <p className="text-body-lg break-words text-body">{name}</p>}
         </div>
-        <dl className="flex flex-wrap gap-x-6 gap-y-2 text-body-md">
-          <div className="flex gap-1">
-            <dt className="text-mute">Seguidores</dt>
-            <dd className="text-label-sm text-ink">{formatCount(followers)}</dd>
-          </div>
-          <div className="flex gap-1">
-            <dt className="text-mute">Seguindo</dt>
-            <dd className="text-label-sm text-ink">{formatCount(following)}</dd>
-          </div>
+        <p className={`text-body-md break-words ${bio ? 'text-body' : 'text-mute'}`}>{bio ?? 'Sem bio.'}</p>
+        <dl className="grid grid-cols-3 gap-2">
+          {tiles.map(([label, value]) => (
+            // Value above its label, as on the design; the term stays first for screen readers.
+            <div
+              key={label}
+              data-testid="profile-tile"
+              className="flex min-w-0 flex-col-reverse gap-1 rounded-md border border-hairline bg-canvas p-2 sm:px-3"
+            >
+              <dt className="text-body-sm text-mute">{label}</dt>
+              <dd className="text-label-sm whitespace-nowrap text-ink tabular-nums sm:text-heading-md">
+                {formatCount(value)}
+              </dd>
+            </div>
+          ))}
         </dl>
-        <p className={`text-body-md break-words ${bio ? 'text-body' : 'text-mute'}`}>
-          {bio ?? 'Sem bio.'}
-        </p>
-        <div className="flex flex-col items-start gap-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           {email && (
             <a
               href={`mailto:${email}`}

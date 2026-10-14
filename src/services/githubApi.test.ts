@@ -10,7 +10,7 @@ import {
   repositoryOf,
 } from '../test/github'
 import type { Profile, Repository } from '../types/github'
-import { getRepositories, getRepository, getUser, GitHubApiError, type GitHubError } from './githubApi'
+import { getReadme, getRepositories, getRepository, getUser, GitHubApiError, type GitHubError } from './githubApi'
 
 let fetchSpy: ReturnType<typeof vi.fn>
 
@@ -426,5 +426,74 @@ describe('getRepository', () => {
       kind: 'unexpected',
       status: 500,
     })
+  })
+})
+
+describe('getReadme', () => {
+  const htmlResponse = (body: string, status = 200, headers: Record<string, string> = {}) =>
+    new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', ...headers } })
+
+  it('getReadme requests the rendered HTML anonymously and returns it as text', async () => {
+    fetchSpy.mockResolvedValue(htmlResponse('<h1>Hello</h1>'))
+
+    const html = await getReadme('octocat', 'Hello-World')
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit | undefined]
+    expect(url).toBe('https://api.github.com/repos/octocat/Hello-World/readme')
+    expect(init?.method ?? 'GET').toBe('GET')
+    const headers = new Headers(init?.headers)
+    expect(headers.get('Accept')).toBe('application/vnd.github.html+json')
+    expect(headers.has('Authorization')).toBe(false)
+    expect(html).toBe('<h1>Hello</h1>')
+  })
+
+  it('getReadme encodes the owner and the repository name', async () => {
+    fetchSpy.mockResolvedValue(htmlResponse(''))
+
+    await getReadme('a b', 'x/y')
+
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://api.github.com/repos/a%20b/x%2Fy/readme')
+  })
+
+  it('getReadme: 404 means no README, not an error', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ message: 'Not Found' }, 404))
+
+    expect(await getReadme('octocat', 'bare')).toBeNull()
+  })
+
+  it('getReadme maps each failure to its domain error', async () => {
+    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    expect(await failureOf(getReadme('octocat', 'Hello-World'))).toEqual({ kind: 'network' })
+
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ message: 'API rate limit exceeded' }, 403, {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': '1791900300',
+      }),
+    )
+    expect(await failureOf(getReadme('octocat', 'Hello-World'))).toEqual({
+      kind: 'rate-limited',
+      resetAt: new Date(1791900300 * 1000),
+    })
+
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: 'Too Many' }, 429, { 'retry-after': '60' }))
+    expect((await failureOf(getReadme('octocat', 'Hello-World'))).kind).toBe('rate-limited')
+
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ message: 'Server Error' }, 500))
+    expect(await failureOf(getReadme('octocat', 'Hello-World'))).toEqual({ kind: 'unexpected', status: 500 })
+  })
+
+  it('getReadme: an abort rejects with the AbortError, never a domain error', async () => {
+    const controller = new AbortController()
+    fetchSpy.mockImplementation(() => {
+      controller.abort()
+      return Promise.reject(abortError())
+    })
+
+    const error = await getReadme('octocat', 'Hello-World', controller.signal).catch((reason: unknown) => reason)
+
+    expect(error).not.toBeInstanceOf(GitHubApiError)
+    expect((error as DOMException).name).toBe('AbortError')
   })
 })

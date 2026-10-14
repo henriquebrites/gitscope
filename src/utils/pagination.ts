@@ -22,3 +22,21 @@ export function parsePage(raw: string | null, totalPages: number): number {
   const page = Number(raw)
   return page >= 1 && page <= totalPages ? page : 1
 }
+
+/** A page number, or a gap standing for two or more hidden pages. */
+export type PagerItem = number | 'gap'
+
+/**
+ * Numbered pager: the first page, the last, and the current one with a neighbour on each side.
+ * A jump that hides one page shows that page; one that hides two or more becomes a gap.
+ * 10 pages, on page 5: 1 … 4 5 6 … 10.
+ */
+export function pagerItems(page: number, totalPages: number): PagerItem[] {
+  // Already ascending once the pages outside 1..totalPages are dropped.
+  const shown = [...new Set([1, page - 1, page, page + 1, totalPages])].filter((n) => n >= 1 && n <= totalPages)
+  return shown.flatMap((n, index): PagerItem[] => {
+    const previous = shown[index - 1]
+    if (previous === undefined || n - previous === 1) return [n]
+    return n - previous === 2 ? [n - 1, n] : ['gap', n]
+  })
+}

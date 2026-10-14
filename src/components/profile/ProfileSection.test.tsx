@@ -49,6 +49,17 @@ describe('ProfileSection', () => {
     expect(within(section).queryByRole('heading')).not.toBeInTheDocument()
   })
 
+  it("skeleton has the card's composition: cover, avatar circle and three tiles, hidden", () => {
+    const { section } = renderSection({ status: 'loading' })
+
+    const skeleton = within(section).getByTestId('profile-skeleton')
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
+    const cover = within(skeleton).getByTestId('skeleton-cover')
+    expect(skeleton.firstElementChild).toBe(cover)
+    expect(within(skeleton).getByTestId('skeleton-avatar')).toHaveClass('rounded-full', '-mt-10')
+    expect(within(skeleton).getAllByTestId('skeleton-tile')).toHaveLength(3)
+  })
+
   it('outside loading the live region is empty and there is no skeleton', () => {
     const { section } = renderSection({ status: 'success', profile: octocat })
 

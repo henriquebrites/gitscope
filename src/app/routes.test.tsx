@@ -4,7 +4,7 @@ import type { RouteObject } from 'react-router-dom'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usedClasses, usesToken, withoutVariants } from '../test/classes'
-import { deferred, githubFetch, jsonResponse, octocat } from '../test/github'
+import { deferred, githubFetch, jsonResponse, octocat, repositoriesOf } from '../test/github'
 import { spacingReport } from '../test/spacing'
 import { tokensOf } from '../test/theme'
 import { routes } from './routes'
@@ -100,7 +100,33 @@ describe('routes', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it.each(screens)('header search on every screen (%s)', async (path) => {
+  it('home: one search, in the hero', () => {
+    renderAt('/')
+
+    const banner = screen.getByRole('banner')
+    expect(within(banner).queryByRole('search')).not.toBeInTheDocument()
+    expect(within(banner).getByRole('link', { name: 'GitHub Explorer' })).toHaveAttribute('href', '/')
+    expect(within(banner).getByRole('button', { name: 'Usar tema escuro' })).toBeInTheDocument()
+    const [search, ...others] = screen.getAllByRole('search')
+    expect(others).toEqual([])
+    expect(within(screen.getByRole('main')).getByRole('search')).toBe(search)
+    expect(within(search).getByRole('textbox', { name: 'Nome de usuário do GitHub' })).toBeVisible()
+    expect(within(search).getByRole('button', { name: 'Buscar' })).toBeVisible()
+    expect(within(search).getByText('Use o login exato da conta, por exemplo octocat.')).not.toHaveClass('sr-only')
+  })
+
+  it('example link opens the profile without query', async () => {
+    const user = userEvent.setup()
+    const { router } = renderAt('/')
+
+    await user.click(screen.getByRole('link', { name: 'torvalds' }))
+
+    expect(router.state.location.pathname).toBe('/users/torvalds')
+    expect(router.state.location.search).toBe('')
+    expect(await screen.findByRole('heading', { level: 1, name: 'torvalds' })).toBeVisible()
+  })
+
+  it.each(screens.filter((path) => path !== '/'))('header search on every other screen (%s)', async (path) => {
     renderAt(path)
 
     const banner = screen.getByRole('banner')
@@ -110,14 +136,21 @@ describe('routes', () => {
     expect(await within(search).findByRole('button', { name: 'Buscar' })).toBeVisible()
   })
 
-  it('blank search stays put and requests nothing', async () => {
+  it.each([
+    ['hero', '/'],
+    ['header', '/foo/bar'],
+  ])('blank search stays put and requests nothing (%s)', async (_place, path) => {
     const user = userEvent.setup()
-    const { router } = renderAt('/')
+    const { router } = renderAt(path)
+    const search = screen.getByRole('search')
+    const field = within(search).getByRole('textbox', { name: 'Nome de usuário do GitHub' })
 
-    await user.type(searchField(), '   {Enter}')
-    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+    await user.type(field, '   {Enter}')
+    expect(field).toHaveFocus()
+    expect(within(search).getByText('Digite um nome de usuário para buscar.')).toBeVisible()
+    await user.click(within(search).getByRole('button', { name: 'Buscar' }))
 
-    expect(router.state.location.pathname).toBe('/')
+    expect(router.state.location.pathname).toBe(path)
     expect(router.state.historyAction).toBe('POP')
     expect(fetchSpy).not.toHaveBeenCalled()
   })
@@ -159,7 +192,7 @@ describe('routes', () => {
 
   it('field starts empty after navigation', async () => {
     const user = userEvent.setup()
-    renderAt('/')
+    renderAt('/foo/bar')
 
     await user.type(searchField(), 'octocat{Enter}')
 
@@ -185,6 +218,21 @@ describe('routes', () => {
 
     expect(usesToken(classes, ['bg', 'text', 'border'], tokensOf('color')), 'color').toBe(true)
     expect(usesToken(classes, ['text'], tokensOf('text')), 'typography').toBe(true)
+    const { spacing, offScale } = await spacingReport(rawClasses)
+    expect(spacing.length, 'spacing').toBeGreaterThan(0)
+    expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])
+  })
+
+  it.each([
+    ['home with hero and examples', '/', () => screen.getByTestId('hero-glow')],
+    ['profile with cover, tiles and pager', '/users/octocat', () => screen.findByRole('navigation', { name: 'Páginas de repositórios' })],
+    ['detail with README', '/users/octocat/repos/hello-world', () => screen.findByTestId('readme-content')],
+  ])('spacing on the loaded %s', async (_name, path, ready) => {
+    fetchSpy.mockImplementation(githubFetch({ octocat: repositoriesOf('r', 45) }))
+    const { container } = renderAt(path)
+    await ready()
+    const rawClasses = usedClasses(container)
+
     const { spacing, offScale } = await spacingReport(rawClasses)
     expect(spacing.length, 'spacing').toBeGreaterThan(0)
     expect(offScale, 'spacing off the DESIGN.md scale').toEqual([])

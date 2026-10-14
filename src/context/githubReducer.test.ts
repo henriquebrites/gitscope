@@ -4,15 +4,15 @@ import {
   githubReducer,
   initialGitHubState,
   isProfileLoading,
+  repositoryKey,
   userKey,
   type GitHubAction,
   type GitHubState,
 } from './githubReducer'
 
 const loadingA: GitHubState = {
-  users: {},
+  ...initialGitHubState,
   profileRequest: { key: 'a', status: 'loading' },
-  reposRequest: null,
 }
 const network = { kind: 'network' } as const
 
@@ -30,6 +30,8 @@ describe('githubReducer', () => {
       users: { a: { profile: octocat } },
       profileRequest: null,
       reposRequest: null,
+      readmes: {},
+      readmeRequest: null,
     })
   })
 
@@ -38,6 +40,8 @@ describe('githubReducer', () => {
       users: {},
       profileRequest: { key: 'a', status: 'error', error: network },
       reposRequest: null,
+      readmes: {},
+      readmeRequest: null,
     })
   })
 
@@ -46,6 +50,8 @@ describe('githubReducer', () => {
       users: {},
       profileRequest: null,
       reposRequest: null,
+      readmes: {},
+      readmeRequest: null,
     })
   })
 
@@ -59,6 +65,7 @@ describe('githubReducer', () => {
 
   it('requested takes over from a failed request of another key', () => {
     const errorA: GitHubState = {
+      ...initialGitHubState,
       users: {},
       profileRequest: { key: 'a', status: 'error', error: network },
       reposRequest: null,
@@ -74,6 +81,7 @@ describe('githubReducer', () => {
     expect(isProfileLoading(initialGitHubState)).toBe(false)
     expect(
       isProfileLoading({
+        ...initialGitHubState,
         users: {},
         profileRequest: { key: 'a', status: 'error', error: network },
         reposRequest: null,
@@ -87,7 +95,7 @@ describe('githubReducer', () => {
 
   describe('repos', () => {
     const repositories = [repositoryOf('hello-world')]
-    const cachedA: GitHubState = { users: { a: { profile: octocat } }, profileRequest: null, reposRequest: null }
+    const cachedA: GitHubState = { ...initialGitHubState, users: { a: { profile: octocat } } }
     const reposLoadingA: GitHubState = { ...cachedA, reposRequest: { key: 'a', status: 'loading', page: 1 } }
 
     it('requested starts at page 1, replacing any other request', () => {
@@ -113,6 +121,8 @@ describe('githubReducer', () => {
         users: { a: { profile: octocat, repositories } },
         profileRequest: null,
         reposRequest: null,
+        readmes: {},
+        readmeRequest: null,
       })
     })
 
@@ -144,6 +154,7 @@ describe('githubReducer', () => {
 
     it('profile loaded keeps repositories already cached', () => {
       const withRepos: GitHubState = {
+        ...initialGitHubState,
         users: { a: { profile: octocat, repositories } },
         profileRequest: { key: 'a', status: 'loading' },
         reposRequest: null,
@@ -159,5 +170,46 @@ describe('githubReducer', () => {
         status: 'loading',
       })
     })
+  })
+})
+
+describe('githubReducer: readme', () => {
+  const requested = (key: string, state: GitHubState = initialGitHubState) =>
+    githubReducer(state, { type: 'readme/requested', key })
+
+  it('readme: repositoryKey lowercases owner and name', () => {
+    expect(repositoryKey('OctoCat', 'Hello-World')).toBe('octocat/hello-world')
+  })
+
+  it('readme: loaded keeps the HTML or the absence (null) under the key and ends the request', () => {
+    const withHtml = githubReducer(requested('o/a'), { type: 'readme/loaded', key: 'o/a', html: '<p>A</p>' })
+    expect(withHtml.readmes).toEqual({ 'o/a': '<p>A</p>' })
+    expect(withHtml.readmeRequest).toBeNull()
+
+    const withAbsence = githubReducer(requested('o/b', withHtml), { type: 'readme/loaded', key: 'o/b', html: null })
+    expect(withAbsence.readmes).toEqual({ 'o/a': '<p>A</p>', 'o/b': null })
+  })
+
+  it('readme: failed keeps the error on the request only, never in the cache', () => {
+    const failed = githubReducer(requested('o/a'), { type: 'readme/failed', key: 'o/a', error: network })
+
+    expect(failed.readmeRequest).toEqual({ key: 'o/a', status: 'error', error: network })
+    expect(failed.readmes).toEqual({})
+    // A new request replaces the failure.
+    expect(requested('o/a', failed).readmeRequest).toEqual({ key: 'o/a', status: 'loading' })
+  })
+
+  it.each<GitHubAction>([
+    { type: 'readme/loaded', key: 'o/old', html: '<p>late</p>' },
+    { type: 'readme/failed', key: 'o/old', error: network },
+    { type: 'readme/cancelled', key: 'o/old' },
+  ])('readme: an answer for another key is stale and dropped ($type)', (action) => {
+    const current = requested('o/new')
+
+    expect(githubReducer(current, action)).toBe(current)
+  })
+
+  it('readme: cancelled ends the request of the key', () => {
+    expect(githubReducer(requested('o/a'), { type: 'readme/cancelled', key: 'o/a' }).readmeRequest).toBeNull()
   })
 })

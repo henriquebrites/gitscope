@@ -62,6 +62,13 @@ export function repositoriesOf(prefix: string, count: number): RepositoryFixture
   return Array.from({ length: count }, (_, index) => repositoryOf(`${prefix}-${String(index + 1).padStart(3, '0')}`))
 }
 
+/** Serves every avatar (profile, home examples) as a local pixel. */
+export async function stubAvatars(page: Page) {
+  await page.route('https://avatars.githubusercontent.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: pixel }),
+  )
+}
+
 export type UserHandler = (route: Route, login: string) => Promise<void> | void
 export type RepositoriesHandler = (route: Route, login: string, page: number) => Promise<void> | void
 
@@ -98,9 +105,7 @@ const repositoriesPath = /^\/users\/[^/]+\/repos$/
  */
 export async function stubGitHub(page: Page, onUser?: UserHandler, onRepositories?: RepositoriesHandler) {
   const users: string[] = []
-  await page.route('https://avatars.githubusercontent.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'image/png', body: pixel }),
-  )
+  await stubAvatars(page)
   await page.route('https://api.github.com/users/*', (route) => {
     const login = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop() ?? '')
     users.push(login)
@@ -118,6 +123,7 @@ export async function stubGitHub(page: Page, onUser?: UserHandler, onRepositorie
     },
   )
   await stubRepository(page)
+  await stubReadme(page)
   return users
 }
 
@@ -140,6 +146,47 @@ export async function stubRepository(page: Page, onRepository?: RepositoryHandle
       route,
       repositoryOf(name, { full_name: `${owner}/${name}`, html_url: `https://github.com/${owner}/${name}` }),
     )
+  })
+  return requested
+}
+
+/** A README as GitHub renders it for `Accept: application/vnd.github.html+json`. */
+export const readmeHtml = `<div id="readme" class="markdown-body entry-content"><article class="markdown-body">
+<h2>Hello World</h2>
+<p>Repositório de exemplo: <code>branch</code>, <code>commit</code> e <code>pull request</code>.</p>
+<pre><code>git clone https://github.com/octocat/Hello-World</code></pre>
+<h3>O que tem aqui</h3>
+<ul><li>Um README de exemplo</li><li>Instruções para o primeiro pull request</li></ul>
+<table><thead><tr><th>Comando</th><th>Efeito</th></tr></thead><tbody><tr><td>git status</td><td>mostra o estado</td></tr></tbody></table>
+<p>Leia o <a href="https://docs.github.com/">guia</a>.</p>
+</article></div>`
+
+export function html(route: Route, body: string, status = 200, headers: Record<string, string> = {}) {
+  return route.fulfill({
+    status,
+    contentType: 'text/html; charset=utf-8',
+    headers: { 'Access-Control-Allow-Origin': '*', ...headers },
+    body,
+  })
+}
+
+export type ReadmeHandler = (route: Route, owner: string, name: string) => Promise<void> | void
+
+/**
+ * Simulates `GET /repos/{owner}/{repo}/readme`; registered after `stubGitHub`, it takes
+ * precedence. By default every repository has `readmeHtml`. Returns the `owner/name` of
+ * every request.
+ */
+export async function stubReadme(page: Page, onReadme?: ReadmeHandler) {
+  const requested: string[] = []
+  await page.route('https://api.github.com/repos/*/*/readme', (route) => {
+    const [owner, name] = new URL(route.request().url()).pathname
+      .split('/')
+      .slice(2, 4)
+      .map(decodeURIComponent)
+    requested.push(`${owner}/${name}`)
+    if (onReadme) return onReadme(route, owner, name)
+    return html(route, readmeHtml)
   })
   return requested
 }

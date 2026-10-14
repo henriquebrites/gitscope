@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { json, octocat, pagedRepositories, repositoriesOf, stubGitHub } from './support/github.js'
 import { expect, test } from './support/test.js'
+import { expectPage, sortPill } from './support/pager.js'
 
 test.use({ viewport: { width: 320, height: 480 } })
 
@@ -19,6 +20,7 @@ const scrollWidth = (page: Page) => page.evaluate(() => document.documentElement
 
 test.describe('no horizontal scroll', () => {
   test('no horizontal scroll: home', async ({ page }) => {
+    await stubGitHub(page)
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     expect(await scrollWidth(page)).toBeLessThanOrEqual(320)
@@ -27,7 +29,7 @@ test.describe('no horizontal scroll', () => {
   test('no horizontal scroll: profile with list', async ({ page }) => {
     await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('repositorio-de-nome-longo', 45)))
     await page.goto('/users/octocat')
-    await expect(repositories(page).getByText('Página 1 de 2')).toBeVisible()
+    await expectPage(page, repositories(page), 1, 2)
     expect(await scrollWidth(page)).toBeLessThanOrEqual(320)
   })
 
@@ -54,26 +56,29 @@ test('keyboard: search', async ({ page }) => {
 test('keyboard: sort and pagination', async ({ page }) => {
   await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 45)))
   await page.goto('/users/octocat')
-  await expect(repositories(page).getByText('Página 1 de 2')).toBeVisible()
+  await expectPage(page, repositories(page), 1, 2)
 
-  const sort = repositories(page).getByRole('combobox', { name: 'Ordenar por' })
-  await tabTo(page, sort)
-  // Typeahead picks "Nome — A a Z"; arrows on a closed select do nothing on macOS.
-  await page.keyboard.press('n')
+  // The sort group is one Tab stop, its checked pill; the arrow keys move the choice.
+  await tabTo(page, sortPill(repositories(page), 'Mais estrelas'))
+  await page.keyboard.press('ArrowRight')
+  await expect(sortPill(repositories(page), 'Menos estrelas')).toBeChecked()
+  await expect(sortPill(repositories(page), 'Menos estrelas')).toBeFocused()
+  await expect(page).toHaveURL('/users/octocat?sort=stars-asc&page=1')
+  await page.keyboard.press('ArrowRight')
 
-  await expect(sort).toHaveValue('name-asc')
+  await expect(sortPill(repositories(page), 'Nome')).toBeChecked()
   await expect(page).toHaveURL('/users/octocat?sort=name-asc&page=1')
   await expect(repositories(page).getByRole('listitem').first()).toContainText('r-001')
 
   await tabTo(page, repositories(page).getByRole('button', { name: 'Próxima' }))
   await page.keyboard.press('Enter')
-  await expect(repositories(page).getByText('Página 2 de 2')).toBeVisible()
+  await expectPage(page, repositories(page), 2, 2)
   await expect(page).toHaveURL('/users/octocat?sort=name-asc&page=2')
 
   // At the last page the focus moves to "Anterior" (T3).
   await expect(repositories(page).getByRole('button', { name: 'Anterior' })).toBeFocused()
   await page.keyboard.press('Space')
-  await expect(repositories(page).getByText('Página 1 de 2')).toBeVisible()
+  await expectPage(page, repositories(page), 1, 2)
 })
 
 test('keyboard: retry', async ({ page }) => {

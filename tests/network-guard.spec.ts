@@ -1,7 +1,12 @@
-import { json } from './support/github.js'
+import { json, stubAvatars } from './support/github.js'
 import { expect, test } from './support/test.js'
 
 const leaked = 'https://api.github.com/users/octocat'
+
+// The home page loads three avatars; they are stubbed, so only `leaked` reaches the guard.
+test.beforeEach(async ({ page }) => {
+  await stubAvatars(page)
+})
 
 test('unrouted request is aborted and recorded', async ({ page, unroutedRequests }) => {
   await page.goto('/')

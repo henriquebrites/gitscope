@@ -15,6 +15,10 @@ export type RepositoriesRequest =
   | { key: string; status: 'loading'; page: number }
   | { key: string; status: 'error'; error: GitHubError }
 
+export type ReadmeRequest =
+  | { key: string; status: 'loading' }
+  | { key: string; status: 'error'; error: GitHubError }
+
 export interface GitHubState {
   /** Keyed by the lowercase login. */
   users: Record<string, CachedUser>
@@ -22,6 +26,10 @@ export interface GitHubState {
   profileRequest: ProfileRequest | null
   /** The repositories request of the current route, if any is loading or failed. */
   reposRequest: RepositoriesRequest | null
+  /** README HTML by lowercase `owner/repo`; `null` when the repository has none. Errors are never kept here. */
+  readmes: Record<string, string | null>
+  /** The README request of the current route, if one is loading or failed. */
+  readmeRequest: ReadmeRequest | null
 }
 
 export type GitHubAction =
@@ -34,8 +42,23 @@ export type GitHubAction =
   | { type: 'repos/loaded'; key: string; repositories: Repository[] }
   | { type: 'repos/failed'; key: string; error: GitHubError }
   | { type: 'repos/cancelled'; key: string }
+  | { type: 'readme/requested'; key: string }
+  | { type: 'readme/loaded'; key: string; html: string | null }
+  | { type: 'readme/failed'; key: string; error: GitHubError }
+  | { type: 'readme/cancelled'; key: string }
 
-export const initialGitHubState: GitHubState = { users: {}, profileRequest: null, reposRequest: null }
+export const initialGitHubState: GitHubState = {
+  users: {},
+  profileRequest: null,
+  reposRequest: null,
+  readmes: {},
+  readmeRequest: null,
+}
+
+/** Cache key of a repository: owners and repository names are case-insensitive. */
+export function repositoryKey(owner: string, repo: string): string {
+  return `${owner}/${repo}`.toLowerCase()
+}
 
 /** Cache key of a login: GitHub logins are case-insensitive. */
 export function userKey(login: string): string {
@@ -97,8 +120,26 @@ function reposReducer(state: GitHubState, action: GitHubAction): GitHubState {
   }
 }
 
+function readmeReducer(state: GitHubState, action: GitHubAction): GitHubState {
+  if (action.type === 'readme/requested') {
+    return { ...state, readmeRequest: { key: action.key, status: 'loading' } }
+  }
+  if (state.readmeRequest?.key !== action.key) return state
+
+  switch (action.type) {
+    case 'readme/loaded':
+      return { ...state, readmes: { ...state.readmes, [action.key]: action.html }, readmeRequest: null }
+    case 'readme/failed':
+      return { ...state, readmeRequest: { key: action.key, status: 'error', error: action.error } }
+    case 'readme/cancelled':
+      return { ...state, readmeRequest: null }
+    default:
+      return state
+  }
+}
+
 export function githubReducer(state: GitHubState, action: GitHubAction): GitHubState {
-  return action.type.startsWith('profile/')
-    ? profileReducer(state, action)
-    : reposReducer(state, action)
+  if (action.type.startsWith('profile/')) return profileReducer(state, action)
+  if (action.type.startsWith('readme/')) return readmeReducer(state, action)
+  return reposReducer(state, action)
 }

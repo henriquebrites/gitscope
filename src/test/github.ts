@@ -97,14 +97,29 @@ export function pageOf(url: string): number {
   return Number(new URL(url).searchParams.get('page'))
 }
 
+export function htmlResponse(body: string, status = 200) {
+  return new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+}
+
+export function isReadmeUrl(url: string): boolean {
+  return /^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/readme$/.test(url)
+}
+
+/** The README the route stub serves for `name`. */
+export function readmeOf(name: string): string {
+  return `<h2>README of ${name}</h2><p>Paragraph of ${name}.</p>`
+}
+
 /**
  * A `fetch` stub for routes: profiles mirror octocat under the requested login, each login's
- * repositories come from `repositories` (default: none), split in pages of 100, and every
- * single repository exists, mirroring Hello-World under the requested owner and name.
+ * repositories come from `repositories` (default: none), split in pages of 100, every
+ * single repository exists, mirroring Hello-World under the requested owner and name, and
+ * every repository has the README `readmeOf(name)`.
  */
 export function githubFetch(repositories: Record<string, Repository[]> = {}) {
   return async (url: string): Promise<Response> => {
-    const [, root, owner = '', name = ''] = new URL(url).pathname.split('/').map(decodeURIComponent)
+    const [, root, owner = '', name = '', sub] = new URL(url).pathname.split('/').map(decodeURIComponent)
+    if (root === 'repos' && sub === 'readme') return htmlResponse(readmeOf(name))
     if (root === 'repos') {
       return jsonResponse({
         ...helloWorld,

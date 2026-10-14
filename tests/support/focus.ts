@@ -1,6 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 
 export const focusColor = 'rgb(7, 97, 209)'
+/** The focus token in the dark theme (#52a8ff). */
+export const darkFocusColor = 'rgb(82, 168, 255)'
 
 export interface Focused {
   label: string
@@ -57,11 +59,11 @@ export function expectVisualTabOrder(visited: Focused[]) {
   }
 }
 
-/** Every Tab stop shows the solid 2px focus ring in the focus token colour. */
-export function expectFocusRing(visited: Focused[]) {
+/** Every Tab stop shows the solid 2px focus ring in the focus token colour of the theme. */
+export function expectFocusRing(visited: Focused[], color = focusColor) {
   for (const element of visited) {
     expect(element.outlineStyle, element.label).toBe('solid')
     expect(element.outlineWidth, element.label).toBeGreaterThanOrEqual(2)
-    expect(element.outlineColor, element.label).toBe(focusColor)
+    expect(element.outlineColor, element.label).toBe(color)
   }
 }

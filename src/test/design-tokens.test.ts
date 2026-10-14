@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import css from '../index.css?raw'
-import { themeVariables, tokensOf, type TokenGroup } from './theme'
+import { darkThemeVariables, themeVariables, tokensOf, type TokenGroup } from './theme'
 
 // Token names defined by DESIGN.md (getdesign, vercel). DESIGN.md is not versioned,
 // so the names are pinned here.
@@ -39,18 +39,38 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-function contrast(foreground: string, background: string): number {
-  const [lighter, darker] = [luminance(color(foreground)), luminance(color(background))].sort(
+type Theme = 'light' | 'dark'
+
+function contrast(foreground: string, background: string, theme: Theme = 'light'): number {
+  const [lighter, darker] = [luminance(color(foreground, theme)), luminance(color(background, theme))].sort(
     (a, b) => b - a,
   )
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-function color(token: string): string {
-  const value = themeVariables.get(`color-${token}`)
+/** A token's value; in the dark theme, its dark value when it has one, else the shared one. */
+function color(token: string, theme: Theme = 'light'): string {
+  const value =
+    (theme === 'dark' ? darkThemeVariables.get(`color-${token}`) : undefined) ??
+    themeVariables.get(`color-${token}`)
   if (!value?.match(/^#[0-9a-f]{6}$/i)) throw new Error(`color-${token} is not a 6-digit hex`)
   return value
 }
+
+// Key decision 1 of the Vitrine design: the dark palette, checked for AA before the build.
+const darkPalette: Record<string, string> = {
+  canvas: '#0a0a0a', 'canvas-elevated': '#141414', hairline: '#2a2a2a', 'hairline-soft': '#1f1f1f',
+  ink: '#ededed', body: '#a1a1a1', mute: '#8f8f8f', faint: '#8a8a8a', link: '#52a8ff',
+  'link-deep': '#7bbcff', error: '#ff6166', 'error-deep': '#ff8a8f', 'warning-deep': '#f5a623',
+  primary: '#ededed', 'on-primary': '#0a0a0a',
+}
+
+// Every component and page source, where a `dark:` variant would name a theme.
+const sources = import.meta.glob<string>(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}', '!../test/**'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+})
 
 const textTokens = ['ink', 'body', 'mute', 'faint', 'link', 'link-deep', 'error', 'error-deep', 'warning-deep']
 const textSurfaces = ['canvas', 'canvas-elevated', 'hairline-soft']
@@ -95,5 +115,41 @@ describe('design tokens', () => {
 
   it.each(textSurfaces)('contrast: focus ring on %s is at least 3:1', (surface) => {
     expect(contrast('focus', surface)).toBeGreaterThanOrEqual(3)
+  })
+
+  describe('dark theme', () => {
+    it('dark: declares exactly the Key decision 1 palette, plus focus on the dark link', () => {
+      expect(Object.fromEntries(darkThemeVariables)).toEqual({
+        ...Object.fromEntries(Object.entries(darkPalette).map(([name, value]) => [`color-${name}`, value])),
+        'color-focus': '#52a8ff',
+      })
+      // Gradients and accents are the same in both themes.
+      expect([...darkThemeVariables.keys()].filter((name) => name.includes('gradient'))).toEqual([])
+    })
+
+    it.each(textTokens.flatMap((text) => textSurfaces.map((surface) => [text, surface])))(
+      'dark: text %s on %s is at least 4.5:1',
+      (text, surface) => {
+        expect(contrast(text, surface, 'dark')).toBeGreaterThanOrEqual(4.5)
+      },
+    )
+
+    it('dark: on-primary on primary is at least 4.5:1', () => {
+      expect(contrast('on-primary', 'primary', 'dark')).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it.each(textSurfaces)('dark: focus ring on %s is at least 3:1', (surface) => {
+      expect(contrast('focus', surface, 'dark')).toBeGreaterThanOrEqual(3)
+    })
+  })
+
+  it('no dark: variant in any source: the theme only changes token values', () => {
+    expect(Object.keys(sources)).toEqual(
+      expect.arrayContaining(['../components/layout/AppHeader.tsx', '../pages/HomePage.tsx']),
+    )
+    const offenders = Object.entries(sources)
+      .filter(([, source]) => /(?:^|[\s'"`{])dark:/m.test(source))
+      .map(([path]) => path)
+    expect(offenders).toEqual([])
   })
 })

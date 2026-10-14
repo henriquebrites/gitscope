@@ -1,12 +1,14 @@
 import type { Page } from '@playwright/test'
 import { json, octocat, pagedRepositories, repositoriesOf, repositoryOf, stubGitHub } from './support/github.js'
 import { expect, test } from './support/test.js'
+import { expectPage, sortPill } from './support/pager.js'
 
 const profileHeading = (page: Page, login = 'octocat') =>
   page.getByRole('region', { name: 'Perfil' }).getByRole('heading', { level: 1, name: login })
 const repositories = (page: Page) => page.getByRole('region', { name: 'Repositórios' })
+// Each screen has one search: the hero's on the home page, the header's elsewhere.
 const searchField = (page: Page) =>
-  page.getByRole('banner').getByRole('textbox', { name: 'Nome de usuário do GitHub' })
+  page.getByRole('search').getByRole('textbox', { name: 'Nome de usuário do GitHub' })
 
 /** Counts requests to the profile and to the repository list endpoints. */
 function countApiRequests(page: Page) {
@@ -41,7 +43,7 @@ test('flow A: search to sorted profile', async ({ page }) => {
   await expect(repositories(page).getByRole('listitem')).toHaveCount(3)
   const names = await repositories(page).getByRole('listitem').getByRole('link').allTextContents()
   expect(names).toEqual(['top', 'mid', 'low'])
-  await expect(repositories(page).getByRole('combobox', { name: 'Ordenar por' })).toHaveValue('stars-desc')
+  await expect(sortPill(repositories(page), 'Mais estrelas')).toBeChecked()
 })
 
 test('flow A: repositories failure keeps the profile', async ({ page }) => {
@@ -66,9 +68,10 @@ test('flow B: sort, open, back, external link', async ({ page }) => {
   await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 45)))
   const counts = countApiRequests(page)
   await page.goto('/users/octocat')
-  await expect(repositories(page).getByText('Página 1 de 2')).toBeVisible()
+  await expectPage(page, repositories(page), 1, 2)
 
-  await repositories(page).getByRole('combobox', { name: 'Ordenar por' }).selectOption('name-asc')
+  // The URL drives the checked pill, so it turns checked once the navigation lands.
+  await sortPill(repositories(page), 'Nome').click()
 
   await expect(page).toHaveURL('/users/octocat?sort=name-asc&page=1')
   await expect(repositories(page).getByRole('listitem').first()).toContainText('r-001')
@@ -88,8 +91,8 @@ test('flow B: sort, open, back, external link', async ({ page }) => {
   await page.getByRole('link', { name: 'Voltar aos repositórios' }).click()
 
   await expect(page).toHaveURL('/users/octocat?sort=name-asc&page=2')
-  await expect(repositories(page).getByText('Página 2 de 2')).toBeVisible()
-  await expect(repositories(page).getByRole('combobox', { name: 'Ordenar por' })).toHaveValue('name-asc')
+  await expectPage(page, repositories(page), 2, 2)
+  await expect(sortPill(repositories(page), 'Nome')).toBeChecked()
   expect(counts).toEqual({ users: 1, repositoryPages: 1, repository: 0 })
 })
 

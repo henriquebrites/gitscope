@@ -152,3 +152,44 @@ test('requests go only to the GitHub API, without credentials', async ({ page })
     { url: 'https://api.github.com/users/octocat/repos?per_page=100&page=1', authorization: undefined },
   ])
 })
+
+test('avatar overlaps the cover edge', async ({ page }) => {
+  await stubGitHub(page)
+  await page.goto('/users/octocat')
+  await expect(page.getByRole('heading', { level: 1, name: 'octocat' })).toBeVisible()
+
+  const cover = await page.getByTestId('profile-cover').boundingBox()
+  const avatar = await page.getByRole('img', { name: 'Avatar de octocat' }).boundingBox()
+  expect(cover && avatar).toBeTruthy()
+  const coverBottom = cover!.y + cover!.height
+  expect(cover!.height).toBeGreaterThan(0)
+  expect(avatar!.y).toBeLessThan(coverBottom)
+  expect(avatar!.y + avatar!.height).toBeGreaterThan(coverBottom)
+})
+
+test('tiles side by side at 320, large values whole', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 480 })
+  await stubGitHub(page, (route, login) =>
+    json(route, { ...octocat, login, followers: 1234567, following: 1234567, public_repos: 1234567 }),
+  )
+  await page.goto('/users/octocat')
+  await expect(page.getByRole('heading', { level: 1, name: 'octocat' })).toBeVisible()
+
+  const tiles = page.getByTestId('profile-tile')
+  await expect(tiles).toHaveCount(3)
+  const boxes = await Promise.all([0, 1, 2].map((index) => tiles.nth(index).boundingBox()))
+  for (const [index, tile] of boxes.entries()) {
+    expect(tile).toBeTruthy()
+    expect(tile!.y).toBe(boxes[0]!.y)
+    if (index > 0) expect(tile!.x).toBeGreaterThan(boxes[index - 1]!.x + boxes[index - 1]!.width - 1)
+    const value = tiles.nth(index).getByRole('definition')
+    await expect(value).toHaveText('1.234.567')
+    // Whole: the text fits its own box, and the box sits inside the tile.
+    const fits = await value.evaluate((element) => element.scrollWidth <= element.clientWidth)
+    expect(fits).toBe(true)
+    const valueBox = (await value.boundingBox())!
+    expect(valueBox.x).toBeGreaterThanOrEqual(tile!.x)
+    expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(tile!.x + tile!.width)
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+})
