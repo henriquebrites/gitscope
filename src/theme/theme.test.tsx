@@ -92,6 +92,20 @@ describe('ThemeToggle', () => {
     expect(root()).toBe('light')
   })
 
+  it.each(['system', 'DARK', ''])(
+    'system change with an invalid stored value (%j) follows the system, as with no choice',
+    async (stored) => {
+      localStorage.setItem(THEME_STORAGE_KEY, stored)
+      const setSystem = stubSystem(false)
+      render(<ThemeToggle />)
+
+      await setSystem(true)
+      expect(root()).toBe('dark')
+      await setSystem(false)
+      expect(root()).toBe('light')
+    },
+  )
+
   it('system change with a stored choice changes nothing', async () => {
     const setSystem = stubSystem(false)
     render(<ThemeToggle />)

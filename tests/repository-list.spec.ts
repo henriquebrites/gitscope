@@ -173,55 +173,63 @@ test.describe('grid columns', () => {
     return Promise.all([0, 1, 2, 3, 4, 5].map(async (index) => (await cards.nth(index).boundingBox())!))
   }
 
-  test('grid columns: two from 640px, same height on a row', async ({ page }) => {
-    await page.setViewportSize(desktop)
-    const boxes = await cardBoxes(page)
+  for (const viewport of [{ width: 640, height: 800 }, desktop]) {
+    test(`grid columns: two from 640px, same height on a row (${viewport.width})`, async ({ page }) => {
+      await page.setViewportSize(viewport)
+      const boxes = await cardBoxes(page)
 
-    for (let row = 0; row < 3; row += 1) {
-      const [left, right] = [boxes[row * 2], boxes[row * 2 + 1]]
-      expect(right.y).toBe(left.y)
-      expect(right.x).toBeGreaterThan(left.x + left.width - 1)
-      expect(right.height).toBe(left.height)
-    }
-    expect(boxes[2].y).toBeGreaterThan(boxes[0].y)
+      for (let row = 0; row < 3; row += 1) {
+        const [left, right] = [boxes[row * 2], boxes[row * 2 + 1]]
+        expect(right.y).toBe(left.y)
+        expect(right.x).toBeGreaterThan(left.x + left.width - 1)
+        expect(right.height).toBe(left.height)
+      }
+      expect(boxes[2].y).toBeGreaterThan(boxes[0].y)
+    })
+  }
+
+  for (const viewport of [mobile, { width: 639, height: 800 }]) {
+    test(`grid columns: one below 640px (${viewport.width})`, async ({ page }) => {
+      await page.setViewportSize(viewport)
+      const boxes = await cardBoxes(page)
+
+      for (let index = 1; index < boxes.length; index += 1) {
+        expect(boxes[index].x).toBe(boxes[0].x)
+        expect(boxes[index].y).toBeGreaterThan(boxes[index - 1].y)
+      }
+    })
+  }
+})
+
+for (const viewport of [mobile, { width: 639, height: 800 }]) {
+  test(`compact pager below 640: Anterior, "p de N", Próxima (${viewport.width})`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 300)))
+    await page.goto('/users/octocat?page=3')
+
+    const pager = section(page).getByRole('navigation', { name: 'Páginas de repositórios' })
+    await expect(pager.getByTestId('pager-compact')).toHaveText('3 de 10')
+    await expect(pager.getByTestId('pager-numbers')).toBeHidden()
+    const visible = await pager.evaluate((nav) =>
+      [...nav.children].filter((child) => getComputedStyle(child).display !== 'none').map((child) => child.textContent),
+    )
+    expect(visible).toEqual(['Anterior', '3 de 10', 'Próxima'])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width)
   })
+}
 
-  test('grid columns: one below 640px', async ({ page }) => {
-    await page.setViewportSize(mobile)
-    const boxes = await cardBoxes(page)
+for (const viewport of [{ width: 640, height: 800 }, desktop]) {
+  test(`numbered pager from 640px: truncated numbers between the arrows (${viewport.width})`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 300)))
+    await page.goto('/users/octocat?page=5')
 
-    for (let index = 1; index < boxes.length; index += 1) {
-      expect(boxes[index].x).toBe(boxes[0].x)
-      expect(boxes[index].y).toBeGreaterThan(boxes[index - 1].y)
-    }
+    const pager = section(page).getByRole('navigation', { name: 'Páginas de repositórios' })
+    await expect(pager.getByTestId('pager-compact')).toBeHidden()
+    await expect(pager.getByTestId('pager-numbers')).toHaveText('1…456…10')
+    await expect(pager.getByRole('button', { name: 'Página 5', exact: true })).toHaveAttribute('aria-current', 'page')
   })
-})
-
-test('compact pager at 320: Anterior, "p de N", Próxima', async ({ page }) => {
-  await page.setViewportSize(mobile)
-  await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 300)))
-  await page.goto('/users/octocat?page=3')
-
-  const pager = section(page).getByRole('navigation', { name: 'Páginas de repositórios' })
-  await expect(pager.getByTestId('pager-compact')).toHaveText('3 de 10')
-  await expect(pager.getByTestId('pager-numbers')).toBeHidden()
-  const visible = await pager.evaluate((nav) =>
-    [...nav.children].filter((child) => getComputedStyle(child).display !== 'none').map((child) => child.textContent),
-  )
-  expect(visible).toEqual(['Anterior', '3 de 10', 'Próxima'])
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
-})
-
-test('numbered pager from 640px: truncated numbers between the arrows', async ({ page }) => {
-  await page.setViewportSize(desktop)
-  await stubGitHub(page, undefined, pagedRepositories(repositoriesOf('r', 300)))
-  await page.goto('/users/octocat?page=5')
-
-  const pager = section(page).getByRole('navigation', { name: 'Páginas de repositórios' })
-  await expect(pager.getByTestId('pager-compact')).toBeHidden()
-  await expect(pager.getByTestId('pager-numbers')).toHaveText('1…456…10')
-  await expect(pager.getByRole('button', { name: 'Página 5', exact: true })).toHaveAttribute('aria-current', 'page')
-})
+}
 
 test('focus stays on the page number, now current', async ({ page }) => {
   await page.setViewportSize(desktop)

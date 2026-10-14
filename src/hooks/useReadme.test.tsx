@@ -55,6 +55,23 @@ describe('useReadme', () => {
     await waitFor(() => expect(result.current.result).toEqual({ status: 'absent' }))
   })
 
+  it.each([
+    ['200', () => htmlResponse('<p>A</p>'), { status: 'success', html: '<p>A</p>' }],
+    ['404', () => jsonResponse({ message: 'Not Found' }, 404), { status: 'absent' }],
+  ] as const)('cache: a %s answer is served again, in any case, without a request', async (_status, answer, expected) => {
+    fetchSpy.mockImplementation(async () => answer())
+    const { result, rerender } = renderReadme({ repo: 'Hello-World', enabled: true })
+    await waitFor(() => expect(result.current.result).toEqual(expected))
+
+    rerender({ repo: 'other', enabled: true })
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2))
+    rerender({ repo: 'HELLO-world', enabled: true })
+
+    expect(result.current.result).toEqual(expected)
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
+
   it('abort: a repository change aborts the README in flight and drops its late answer', async () => {
     const first = deferred<Response>()
     const second = deferred<Response>()

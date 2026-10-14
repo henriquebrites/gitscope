@@ -3,7 +3,7 @@ import { darkFocusColor, expectFocusRing, focusColor, tabThrough } from './suppo
 import { pagedRepositories, repositoriesOf, stubGitHub } from './support/github.js'
 import { expect, test } from './support/test.js'
 
-const routes = ['/', '/users/octocat', '/foo/bar']
+const routes = ['/', '/users/octocat', '/users/octocat/repos/Hello-World', '/foo/bar']
 
 const toggle = (page: Page) => page.getByRole('button', { name: /^Usar tema (claro|escuro)$/ })
 const rootTheme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute('data-theme'))

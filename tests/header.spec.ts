@@ -19,47 +19,51 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const path of otherRoutes) {
-  test(`one row at 1280 (${path})`, async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 })
-    await page.goto(path)
-    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible()
+  for (const width of [640, 1280]) {
+    test(`one row at ${width} (${path})`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto(path)
+      await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible()
 
-    const parts = [
-      banner(page).getByRole('link', { name: 'GitHub Explorer' }),
-      banner(page).getByRole('textbox', { name: 'Nome de usuário do GitHub' }),
-      banner(page).getByRole('button', { name: 'Buscar' }),
-      banner(page).getByRole('button', { name: 'Usar tema escuro' }),
-    ]
-    const boxes = await Promise.all(parts.map(box))
-    // Same row: every part crosses the wordmark's vertical middle; left to right in this order.
-    for (const part of boxes) {
-      expect(part.y).toBeLessThan(middle(boxes[0]))
-      expect(part.y + part.height).toBeGreaterThan(middle(boxes[0]))
-    }
-    for (let index = 1; index < boxes.length; index += 1) {
-      expect(boxes[index].x).toBeGreaterThan(boxes[index - 1].x)
-    }
-    // Kept for screen readers only: clipped to a 1px box.
-    const hint = await banner(page).getByText('Use o login exato da conta, por exemplo octocat.').boundingBox()
-    expect(hint === null || (hint.width <= 1 && hint.height <= 1)).toBe(true)
-  })
+      const parts = [
+        banner(page).getByRole('link', { name: 'GitHub Explorer' }),
+        banner(page).getByRole('textbox', { name: 'Nome de usuário do GitHub' }),
+        banner(page).getByRole('button', { name: 'Buscar' }),
+        banner(page).getByRole('button', { name: 'Usar tema escuro' }),
+      ]
+      const boxes = await Promise.all(parts.map(box))
+      // Same row: every part crosses the wordmark's vertical middle; left to right in this order.
+      for (const part of boxes) {
+        expect(part.y).toBeLessThan(middle(boxes[0]))
+        expect(part.y + part.height).toBeGreaterThan(middle(boxes[0]))
+      }
+      for (let index = 1; index < boxes.length; index += 1) {
+        expect(boxes[index].x).toBeGreaterThan(boxes[index - 1].x)
+      }
+      // Kept for screen readers only: clipped to a 1px box.
+      const hint = await banner(page).getByText('Use o login exato da conta, por exemplo octocat.').boundingBox()
+      expect(hint === null || (hint.width <= 1 && hint.height <= 1)).toBe(true)
+    })
+  }
 
-  test(`two rows at 320 (${path})`, async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 480 })
-    await page.goto(path)
-    await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible()
+  for (const width of [320, 639]) {
+    test(`two rows at ${width} (${path})`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 480 })
+      await page.goto(path)
+      await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible()
 
-    const brand = await box(banner(page).getByRole('link', { name: 'GitHub Explorer' }))
-    const theme = await box(banner(page).getByRole('button', { name: 'Usar tema escuro' }))
-    const field = await box(banner(page).getByRole('textbox', { name: 'Nome de usuário do GitHub' }))
-    const search = await box(banner(page).getByRole('button', { name: 'Buscar' }))
+      const brand = await box(banner(page).getByRole('link', { name: 'GitHub Explorer' }))
+      const theme = await box(banner(page).getByRole('button', { name: 'Usar tema escuro' }))
+      const field = await box(banner(page).getByRole('textbox', { name: 'Nome de usuário do GitHub' }))
+      const search = await box(banner(page).getByRole('button', { name: 'Buscar' }))
 
-    expect(theme.y).toBeLessThan(middle(brand))
-    expect(theme.y + theme.height).toBeGreaterThan(middle(brand))
-    expect(theme.x).toBeGreaterThan(brand.x)
-    expect(field.y).toBeGreaterThanOrEqual(Math.max(brand.y + brand.height, theme.y + theme.height))
-    expect(search.y).toBeGreaterThanOrEqual(theme.y + theme.height)
-  })
+      expect(theme.y).toBeLessThan(middle(brand))
+      expect(theme.y + theme.height).toBeGreaterThan(middle(brand))
+      expect(theme.x).toBeGreaterThan(brand.x)
+      expect(field.y).toBeGreaterThanOrEqual(Math.max(brand.y + brand.height, theme.y + theme.height))
+      expect(search.y).toBeGreaterThanOrEqual(theme.y + theme.height)
+    })
+  }
 }
 
 for (const [place, path] of [
