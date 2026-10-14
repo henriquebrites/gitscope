@@ -44,17 +44,17 @@ function toError(response: Response): GitHubError {
 }
 
 /** Anonymous GET; an abort rejects with the original AbortError, never a domain error. */
-async function request<T>(path: string, signal?: AbortSignal): Promise<{ body: T; headers: Headers }> {
-  let response: Response
+async function send(path: string, accept: string, signal?: AbortSignal): Promise<Response> {
   try {
-    response = await fetch(`${API_URL}${path}`, {
-      headers: { Accept: 'application/vnd.github+json' },
-      signal,
-    })
+    return await fetch(`${API_URL}${path}`, { headers: { Accept: accept }, signal })
   } catch (error) {
     if (isAbort(error, signal)) throw error
     throw new GitHubApiError({ kind: 'network' })
   }
+}
+
+async function request<T>(path: string, signal?: AbortSignal): Promise<{ body: T; headers: Headers }> {
+  const response = await send(path, 'application/vnd.github+json', signal)
   if (!response.ok) throw new GitHubApiError(toError(response))
   try {
     return { body: (await response.json()) as T, headers: response.headers }
@@ -131,4 +131,25 @@ export async function getRepository(owner: string, repo: string, signal?: AbortS
     signal,
   )
   return toRepository(body)
+}
+
+/**
+ * README of a repository as GitHub renders it to HTML (`application/vnd.github.html+json`
+ * answers with the HTML itself, not JSON). `null` when the repository has none (404). The HTML
+ * is untrusted: it must be sanitized before it reaches the DOM.
+ */
+export async function getReadme(owner: string, repo: string, signal?: AbortSignal): Promise<string | null> {
+  const response = await send(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/readme`,
+    'application/vnd.github.html+json',
+    signal,
+  )
+  if (response.status === 404) return null
+  if (!response.ok) throw new GitHubApiError(toError(response))
+  try {
+    return await response.text()
+  } catch (error) {
+    if (isAbort(error, signal)) throw error
+    throw new GitHubApiError({ kind: 'unexpected', status: response.status })
+  }
 }

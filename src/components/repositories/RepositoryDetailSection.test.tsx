@@ -26,11 +26,6 @@ function liveRegion(section: HTMLElement) {
   return region as HTMLElement
 }
 
-/** The `<dd>` paired with the `<dt>` that reads `term`. */
-function valueOf(section: HTMLElement, term: string) {
-  const dt = within(section).getByText(term, { selector: 'dt' })
-  return dt.nextElementSibling as HTMLElement
-}
 
 const resetAt = new Date(2026, 9, 12, 14, 5)
 
@@ -59,13 +54,23 @@ describe('RepositoryDetailSection', () => {
     expect(within(section).queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
   })
 
-  it('success shows name, description, stars in pt-BR, language and the external link', () => {
+  it('success shows the band, name, description, stars and language pills and the external link', () => {
     const { section } = renderSection({ status: 'success', repository: helloWorld })
 
+    const card = within(section).getByRole('article')
+    const band = within(card).getByTestId('repository-band')
+    expect(card.firstElementChild).toBe(band)
+    expect(band).toHaveClass('gradient-vitrine')
+    expect(band).toHaveAttribute('aria-hidden', 'true')
     expect(within(section).getByRole('heading', { level: 1, name: 'Hello-World' })).toBeVisible()
     expect(within(section).getByText('My first repository on GitHub!')).toBeVisible()
-    expect(valueOf(section, 'Estrelas')).toHaveTextContent(/^12\.345$/)
-    expect(valueOf(section, 'Linguagem')).toHaveTextContent(/^TypeScript$/)
+    const stars = within(section).getByTestId('repository-stars')
+    expect(stars).toHaveTextContent(/^★\s12\.345 estrelas$/)
+    expect(stars).toHaveClass('rounded-pill')
+    const language = within(section).getByTestId('repository-language')
+    expect(language).toHaveTextContent(/^TypeScript$/)
+    expect(language).toHaveClass('rounded-pill')
+    expect(within(language).getByTestId('language-dot')).toHaveStyle({ backgroundColor: '#3178c6' })
     const link = within(section).getByRole('link', {
       name: 'Ver repositório no GitHub (abre em nova aba)',
     })
@@ -83,8 +88,8 @@ describe('RepositoryDetailSection', () => {
     })
 
     expect(within(section).getByText('Sem descrição.')).toBeVisible()
-    expect(within(section).queryByText('Linguagem')).not.toBeInTheDocument()
-    expect(valueOf(section, 'Estrelas')).toHaveTextContent(/^12\.345$/)
+    expect(within(section).queryByTestId('repository-language')).not.toBeInTheDocument()
+    expect(within(section).getByTestId('repository-stars')).toHaveTextContent(/^★\s12\.345 estrelas$/)
     expect(container.textContent).not.toMatch(/null|undefined/)
   })
 

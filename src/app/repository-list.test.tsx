@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   deferred,
   githubFetch,
+  isReadmeUrl,
   isRepositoriesUrl,
   jsonResponse,
   pageOf,
@@ -38,7 +39,7 @@ const section = () => within(main()).getByRole('region', { name: 'Repositórios'
 const findSection = () => within(main()).findByRole('region', { name: 'Repositórios' })
 const urls = () => fetchSpy.mock.calls.map(([url]) => url as string)
 const repoUrls = () => urls().filter(isRepositoriesUrl)
-const profileUrls = () => urls().filter((url) => !isRepositoriesUrl(url))
+const profileUrls = () => urls().filter((url) => !isRepositoriesUrl(url) && !isReadmeUrl(url))
 const itemNames = () =>
   within(section())
     .queryAllByRole('listitem')
@@ -68,8 +69,10 @@ async function loaded(path: string, repositories: Record<string, Repository[]>) 
   fetchSpy.mockImplementation(githubFetch(repositories))
   const router = renderAt(path)
   await within(await findSection()).findAllByRole('listitem')
-  const before = fetchSpy.mock.calls.length
-  return { router, newRequests: () => fetchSpy.mock.calls.length - before }
+  // Profile, list and repository requests; a detail's README is checked in repository-detail.
+  const count = () => urls().filter((url) => !isReadmeUrl(url)).length
+  const before = count()
+  return { router, newRequests: () => count() - before }
 }
 
 /** 237 repositories over 3 API pages; the one with most stars arrives on page 3. */

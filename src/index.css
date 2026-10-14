@@ -156,4 +156,66 @@
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
+
+  /* README HTML (sanitized), styled only by the theme tokens. Wide code and tables scroll
+   * inside their own block, never the page. */
+  .readme-content {
+    @apply min-w-0 text-body-md text-body;
+    overflow-wrap: anywhere;
+  }
+  .readme-content :where(h1, h2, h3, h4, h5, h6) {
+    @apply mt-6 mb-3 text-ink;
+  }
+  .readme-content :where(h1) {
+    @apply text-heading-lg;
+  }
+  .readme-content :where(h2) {
+    @apply border-b border-hairline pb-2 text-heading-md;
+  }
+  .readme-content :where(h3, h4, h5, h6) {
+    @apply text-label-sm;
+  }
+  .readme-content :where(p, ul, ol, pre, table, blockquote, details) {
+    @apply mb-4;
+  }
+  .readme-content :where(ul) {
+    @apply list-disc pl-6;
+  }
+  .readme-content :where(ol) {
+    @apply list-decimal pl-6;
+  }
+  .readme-content :where(a) {
+    @apply rounded-sm text-link underline;
+  }
+  .readme-content :where(code) {
+    @apply rounded-sm bg-hairline-soft px-1 font-mono text-code text-ink;
+  }
+  .readme-content :where(pre) {
+    @apply overflow-x-auto rounded-sm bg-hairline-soft p-3 font-mono text-code text-ink;
+    overflow-wrap: normal;
+  }
+  .readme-content :where(pre code) {
+    @apply bg-transparent p-0;
+  }
+  .readme-content :where(table) {
+    @apply block max-w-full overflow-x-auto border-collapse;
+    overflow-wrap: normal;
+  }
+  .readme-content :where(th, td) {
+    @apply border border-hairline px-3 py-2 text-left;
+  }
+  .readme-content :where(blockquote) {
+    @apply border-l-4 border-hairline pl-4 text-mute;
+  }
+  .readme-content :where(hr) {
+    @apply my-6 border-hairline;
+  }
+  .readme-content :where(img) {
+    max-width: 100%;
+    height: auto;
+  }
+  /* The first block does not push the README away from its section title. */
+  .readme-content :where(:first-child) {
+    @apply mt-0;
+  }
 }
