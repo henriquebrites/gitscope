@@ -187,6 +187,8 @@ test.describe('readme', () => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await stubGitHub(page)
+    // The relative image resolves against the repository on GitHub; a 404 keeps it broken.
+    await page.route('https://github.com/**', (route) => route.fulfill({ status: 404 }))
     await stubReadme(page, (route) =>
       html(
         route,
