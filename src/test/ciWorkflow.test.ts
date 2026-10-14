@@ -20,10 +20,10 @@ describe('CI workflow', () => {
     expect(header).toMatch(/\n {2}push:\n {4}branches: \[main\]\n/)
   })
 
-  it('sets up node and install in both jobs with Node 22, the npm cache and npm ci', () => {
+  it('sets up node and install in both jobs with Node 24, the npm cache and npm ci', () => {
     for (const job of [checksJob, e2eJob]) {
       expect(job).toContain('uses: actions/setup-node@v4')
-      expect(job).toContain('node-version: 22')
+      expect(job).toContain('node-version: 24')
       expect(job).toContain('cache: npm')
       expect(job).toContain('run: npm ci')
     }
