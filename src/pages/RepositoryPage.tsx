@@ -22,7 +22,9 @@ function RepositoryPage() {
         Voltar aos repositórios
       </Link>
       <RepositoryDetailSection result={result} login={username} onRetry={retry} />
-      {readme.result.status !== 'idle' && <RepositoryReadme result={readme.result} onRetry={readme.retry} />}
+      {readme.result.status !== 'idle' && (
+        <RepositoryReadme owner={username} repo={repoName} result={readme.result} onRetry={readme.retry} />
+      )}
     </>
   )
 }

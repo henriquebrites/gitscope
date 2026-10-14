@@ -249,6 +249,24 @@ describe('repository detail route', () => {
       expect(new Headers(init.headers).get('Accept')).toBe('application/vnd.github.html+json')
     })
 
+    it('readme relative urls point to the repository on GitHub', async () => {
+      fetchSpy.mockImplementation((url: string) =>
+        Promise.resolve(
+          isReadmeUrl(url)
+            ? htmlResponse('<p><a href="docs/guide.md">Guia</a><img src="logo.png" alt="Logo"></p>')
+            : jsonResponse(helloWorld),
+        ),
+      )
+      renderAt('/users/octocat/repos/Hello-World')
+
+      const link = await within(await findReadmeArea()).findByRole('link', { name: 'Guia' })
+      expect(link).toHaveAttribute('href', 'https://github.com/octocat/Hello-World/blob/HEAD/docs/guide.md')
+      expect(within(readmeArea()).getByRole('img', { name: 'Logo' })).toHaveAttribute(
+        'src',
+        'https://github.com/octocat/Hello-World/raw/HEAD/logo.png',
+      )
+    })
+
     it('readme after the repository: from the list cache, exactly one README request', async () => {
       fetchSpy.mockImplementation(githubFetch({ octocat: repositoriesOf('r', 3) }))
       const router = renderAt('/users/octocat')

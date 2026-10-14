@@ -11,7 +11,7 @@ type Shown = Exclude<ReadmeResult, { status: 'idle' }>
 
 function renderReadme(result: Shown) {
   const onRetry = vi.fn()
-  const view = render(<RepositoryReadme result={result} onRetry={onRetry} />)
+  const view = render(<RepositoryReadme owner="octocat" repo="Hello-World" result={result} onRetry={onRetry} />)
   return { ...view, onRetry, section: screen.getByRole('region', { name: 'README' }) }
 }
 

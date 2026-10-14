@@ -4,6 +4,8 @@ import { sanitizeReadme } from '../../utils/sanitizeReadme'
 import { RequestErrorBox, RequestErrorContent } from '../feedback/RequestError'
 
 interface RepositoryReadmeProps {
+  owner: string
+  repo: string
   result: Exclude<ReadmeResult, { status: 'idle' }>
   onRetry: () => void
 }
@@ -20,11 +22,11 @@ function ReadmeSkeleton() {
 }
 
 /** The README in a section of its own, below the repository; its failure never hides the card. */
-function RepositoryReadme({ result, onRetry }: RepositoryReadmeProps) {
+function RepositoryReadme({ owner, repo, result, onRetry }: RepositoryReadmeProps) {
   const headingId = useId()
   const html = result.status === 'success' ? result.html : null
   // Nothing from the README reaches the DOM without passing through the sanitizer.
-  const safeHtml = useMemo(() => (html === null ? null : sanitizeReadme(html)), [html])
+  const safeHtml = useMemo(() => (html === null ? null : sanitizeReadme(html, owner, repo)), [html, owner, repo])
 
   return (
     <section

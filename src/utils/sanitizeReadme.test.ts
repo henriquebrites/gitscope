@@ -3,7 +3,7 @@ import { sanitizeReadme } from './sanitizeReadme'
 
 function parse(html: string): HTMLElement {
   const container = document.createElement('div')
-  container.innerHTML = sanitizeReadme(html)
+  container.innerHTML = sanitizeReadme(html, 'o', 'r')
   return container
 }
 
@@ -77,7 +77,7 @@ describe('sanitizeReadme', () => {
       },
     )
 
-    it.each(['#section', '/docs/readme.md', 'mailto:a@b.c'])(
+    it.each(['#section', 'mailto:a@b.c'])(
       'external links: %s is not an http(s) link and keeps the current tab',
       (href) => {
         const link = parse(`<a href="${href}" target="_blank">x</a>`).querySelector('a')
@@ -85,5 +85,37 @@ describe('sanitizeReadme', () => {
         expect(link).not.toHaveAttribute('target')
       },
     )
+  })
+  describe('relative URLs point to the repository on GitHub', () => {
+    it.each([
+      ['awesome.md', 'https://github.com/o/r/blob/HEAD/awesome.md'],
+      ['/docs/a.md', 'https://github.com/o/r/blob/HEAD/docs/a.md'],
+      ['./x/../b.md', 'https://github.com/o/r/blob/HEAD/b.md'],
+    ])('relative links: %s opens %s in a new tab', (href, resolved) => {
+      const link = parse(`<a href="${href}">x</a>`).querySelector('a')
+
+      expect(link).toHaveAttribute('href', resolved)
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link?.getAttribute('rel')?.split(/\s+/)).toContain('noopener')
+    })
+
+    it.each([
+      ['media/logo.svg', 'https://github.com/o/r/raw/HEAD/media/logo.svg'],
+      ['/a.png', 'https://github.com/o/r/raw/HEAD/a.png'],
+    ])('relative images: %s loads %s', (src, resolved) => {
+      expect(parse(`<img src="${src}" alt="a">`).querySelector('img')).toHaveAttribute('src', resolved)
+    })
+
+    it.each(['#section', 'mailto:a@b.c', 'https://example.com/x', '//cdn.example/x'])(
+      'links kept as is: %s',
+      (href) => {
+        expect(parse(`<a href="${href}">x</a>`).querySelector('a')).toHaveAttribute('href', href)
+      },
+    )
+
+    it('images kept as is: an absolute src', () => {
+      const src = 'https://example.com/a.png'
+      expect(parse(`<img src="${src}" alt="a">`).querySelector('img')).toHaveAttribute('src', src)
+    })
   })
 })
