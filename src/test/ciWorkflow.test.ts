@@ -22,11 +22,17 @@ describe('CI workflow', () => {
 
   it('sets up node and install in both jobs with Node 24, the npm cache and npm ci', () => {
     for (const job of [checksJob, e2eJob]) {
-      expect(job).toContain('uses: actions/setup-node@v4')
+      expect(job).toContain('uses: actions/checkout@v7')
+      expect(job).toContain('uses: actions/setup-node@v7')
       expect(job).toContain('node-version: 24')
       expect(job).toContain('cache: npm')
       expect(job).toContain('run: npm ci')
     }
+  })
+
+  it('pins the action majors that run on Node 24', () => {
+    expect(workflow).not.toContain('@v4')
+    expect(e2eJob).toContain('uses: actions/upload-artifact@v7')
   })
 
   it('runs the checks order: lint, then test, then build', () => {
@@ -45,7 +51,7 @@ describe('CI workflow', () => {
   })
 
   it('uploads the Playwright report on failure', () => {
-    const upload = e2eJob.slice(position(e2eJob, 'uses: actions/upload-artifact@v4') - 60)
+    const upload = e2eJob.slice(position(e2eJob, 'uses: actions/upload-artifact@v7'))
     expect(upload).toContain('if: failure()')
     expect(upload).toContain('name: playwright-report')
     expect(upload).toContain('path: playwright-report/')
